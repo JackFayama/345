@@ -3,103 +3,199 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NovaFX Voice & Video</title>
-  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
+  <title>NovaFX Connect</title>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0f4f8;
+      font-family: 'Segoe UI', sans-serif;
       margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+      background: #f8fafc;
+      color: #111;
     }
-    h1 {
-      color: #16a34a;
-      margin-bottom: 8px;
+    .navbar {
+      background-color: #22c55e;
+      color: white;
+      padding: 1rem;
+      font-size: 1.2rem;
+      font-weight: bold;
     }
     .container {
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-      text-align: center;
-      width: 90%;
-      max-width: 400px;
+      padding: 1rem;
+    }
+    .video-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    @media(min-width: 640px) {
+      .video-grid {
+        flex-direction: row;
+      }
     }
     video {
       width: 100%;
-      border-radius: 8px;
-      margin-top: 10px;
+      max-width: 100%;
+      border-radius: 10px;
+      background: #000;
     }
-    input {
-      padding: 10px;
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1rem;
+    }
+    .input-group label {
+      margin-bottom: 0.3rem;
+    }
+    .input-group input {
+      padding: 0.5rem;
       border: 1px solid #ccc;
-      width: 100%;
-      margin: 10px 0;
-      border-radius: 8px;
+      border-radius: 6px;
     }
-    button {
-      padding: 10px 20px;
-      background: #16a34a;
-      border: none;
+    .btn {
+      background-color: #22c55e;
       color: white;
-      font-weight: bold;
-      border-radius: 8px;
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 6px;
       cursor: pointer;
+      font-weight: bold;
+      margin-top: 1rem;
     }
-    .info {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #555;
+    .popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      z-index: 9999;
+      display: none;
+    }
+    .popup h2 {
+      margin-top: 0;
+    }
+    .popup button {
+      margin-top: 1rem;
+      margin-right: 1rem;
     }
   </style>
 </head>
 <body>
+  <div class="navbar">NovaFX Connect</div>
   <div class="container">
-    <h1>NovaFX Connect</h1>
-    <div>Your ID: <span id="my-id">...</span></div>
-    <input type="text" id="peer-id" placeholder="Enter Peer ID to Call" />
-    <button onclick="makeCall()">Call</button>
-    <video id="my-video" autoplay muted playsinline></video>
-    <video id="peer-video" autoplay playsinline></video>
-    <div class="info">Only share your ID with trusted users.</div>
+    <div class="input-group">
+      <label>Your Personal ID</label>
+      <input type="text" id="userId" placeholder="e.g. Jack2025" />
+    </div>
+    <div class="input-group">
+      <label>Call User ID</label>
+      <input type="text" id="targetId" placeholder="e.g. Jane2025" />
+    </div>
+    <button class="btn" onclick="startCall()">Call</button>
+
+    <div class="video-grid">
+      <video id="localVideo" autoplay muted playsinline></video>
+      <video id="remoteVideo" autoplay playsinline></video>
+    </div>
   </div>
 
+  <div class="popup" id="incomingCallPopup">
+    <h2>Incoming Call</h2>
+    <p id="callerIdLabel">Someone is calling you...</p>
+    <button class="btn" onclick="answerCall()">Accept</button>
+    <button class="btn" onclick="rejectCall()">Reject</button>
+  </div>
+
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <script>
-    const myVideo = document.getElementById('my-video');
-    const peerVideo = document.getElementById('peer-video');
+    const socket = io('https://your-signaling-server.com'); // Replace with your signaling server
+    const userIdInput = document.getElementById('userId');
+    const targetIdInput = document.getElementById('targetId');
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const popup = document.getElementById('incomingCallPopup');
+    const callerIdLabel = document.getElementById('callerIdLabel');
+
     let localStream;
+    let peerConnection;
+    let callerId = null;
 
-    const peer = new Peer();
+    const config = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' }
+      ]
+    };
 
-    peer.on('open', id => {
-      document.getElementById('my-id').textContent = id;
-    });
+    async function setupMedia() {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = localStream;
+    }
 
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
-        localStream = stream;
-        myVideo.srcObject = stream;
-      });
+    function startCall() {
+      callerId = userIdInput.value;
+      const targetId = targetIdInput.value;
+      if (!callerId || !targetId) return alert('Enter both IDs');
 
-    peer.on('call', call => {
-      call.answer(localStream);
-      call.on('stream', remoteStream => {
-        peerVideo.srcObject = remoteStream;
-      });
-    });
+      socket.emit('call', { from: callerId, to: targetId });
+    }
 
-    function makeCall() {
-      const id = document.getElementById('peer-id').value;
-      const call = peer.call(id, localStream);
-      call.on('stream', remoteStream => {
-        peerVideo.srcObject = remoteStream;
+    function answerCall() {
+      popup.style.display = 'none';
+      createPeerConnection();
+      setupMedia().then(() => {
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        socket.emit('accept-call', { from: userIdInput.value, to: callerId });
       });
     }
+
+    function rejectCall() {
+      popup.style.display = 'none';
+      socket.emit('reject-call', { from: userIdInput.value, to: callerId });
+    }
+
+    function createPeerConnection() {
+      peerConnection = new RTCPeerConnection(config);
+      peerConnection.onicecandidate = event => {
+        if (event.candidate) {
+          socket.emit('ice-candidate', { to: callerId, candidate: event.candidate });
+        }
+      };
+      peerConnection.ontrack = event => {
+        remoteVideo.srcObject = event.streams[0];
+      };
+    }
+
+    socket.on('incoming-call', ({ from }) => {
+      callerId = from;
+      callerIdLabel.textContent = `${from} is calling you...`;
+      popup.style.display = 'block';
+    });
+
+    socket.on('start-connection', async ({ from }) => {
+      callerId = from;
+      createPeerConnection();
+      await setupMedia();
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      socket.emit('offer', { to: callerId, offer });
+    });
+
+    socket.on('offer', async ({ offer }) => {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      socket.emit('answer', { to: callerId, answer });
+    });
+
+    socket.on('answer', async ({ answer }) => {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    });
+
+    socket.on('ice-candidate', async ({ candidate }) => {
+      if (candidate) await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    });
   </script>
 </body>
 </html>
