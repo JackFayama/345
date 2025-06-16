@@ -1,201 +1,228 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NovaFX Connect</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      margin: 0;
-      background: #f8fafc;
-      color: #111;
-    }
-    .navbar {
-      background-color: #22c55e;
-      color: white;
-      padding: 1rem;
-      font-size: 1.2rem;
-      font-weight: bold;
-    }
-    .container {
-      padding: 1rem;
-    }
-    .video-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    @media(min-width: 640px) {
-      .video-grid {
-        flex-direction: row;
-      }
-    }
-    video {
-      width: 100%;
-      max-width: 100%;
-      border-radius: 10px;
-      background: #000;
-    }
-    .input-group {
-      display: flex;
-      flex-direction: column;
-      margin-bottom: 1rem;
-    }
-    .input-group label {
-      margin-bottom: 0.3rem;
-    }
-    .input-group input {
-      padding: 0.5rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-    .btn {
-      background-color: #22c55e;
-      color: white;
-      padding: 0.6rem 1.2rem;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-      margin-top: 1rem;
-    }
-    .popup {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      padding: 2rem;
-      border-radius: 12px;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-      z-index: 9999;
-      display: none;
-    }
-    .popup h2 {
-      margin-top: 0;
-    }
-    .popup button {
-      margin-top: 1rem;
-      margin-right: 1rem;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nova Prime Connect - PeerJS Example</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0fdf4;
+    color: #166534;
+    margin: 0; padding: 0;
+  }
+  header {
+    background: #22c55e;
+    color: white;
+    padding: 1rem;
+    font-weight: bold;
+    font-size: 1.4rem;
+  }
+  main {
+    max-width: 500px;
+    margin: 2rem auto;
+    padding: 1rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgb(34 197 94 / 0.3);
+  }
+  label {
+    display: block;
+    margin-top: 1rem;
+    font-weight: 600;
+  }
+  input, button {
+    width: 100%;
+    padding: 0.7rem;
+    margin-top: 0.3rem;
+    border-radius: 6px;
+    border: 1px solid #22c55e;
+    font-size: 1rem;
+  }
+  button {
+    background: #22c55e;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 1.5rem;
+  }
+  video {
+    width: 100%;
+    border-radius: 12px;
+    margin-top: 1rem;
+    background: black;
+  }
+  #incomingCall {
+    background: #dcfce7;
+    border: 1px solid #22c55e;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-top: 1rem;
+  }
+  #incomingCall button {
+    width: auto;
+    margin-right: 1rem;
+    padding: 0.5rem 1rem;
+  }
+</style>
 </head>
 <body>
-  <div class="navbar">NovaFX Connect</div>
-  <div class="container">
-    <div class="input-group">
-      <label>Your Personal ID</label>
-      <input type="text" id="userId" placeholder="e.g. Jack2025" />
-    </div>
-    <div class="input-group">
-      <label>Call User ID</label>
-      <input type="text" id="targetId" placeholder="e.g. Jane2025" />
-    </div>
-    <button class="btn" onclick="startCall()">Call</button>
-
-    <div class="video-grid">
-      <video id="localVideo" autoplay muted playsinline></video>
-      <video id="remoteVideo" autoplay playsinline></video>
-    </div>
+<header>Nova Prime Connect</header>
+<main>
+  <div id="registration">
+    <label for="emailInput">Register your Email (This will be your personal ID)</label>
+    <input type="email" id="emailInput" placeholder="your.email@example.com" />
+    <button id="registerBtn">Register</button>
   </div>
 
-  <div class="popup" id="incomingCallPopup">
-    <h2>Incoming Call</h2>
-    <p id="callerIdLabel">Someone is calling you...</p>
-    <button class="btn" onclick="answerCall()">Accept</button>
-    <button class="btn" onclick="rejectCall()">Reject</button>
+  <div id="callSection" style="display:none;">
+    <p>Your Personal ID: <strong id="myId"></strong></p>
+
+    <label for="callToInput">Call User by Email ID</label>
+    <input type="text" id="callToInput" placeholder="friend.email@example.com" />
+    <button id="callBtn">Call</button>
+
+    <div id="incomingCall" style="display:none;">
+      <p><strong id="callerId"></strong> is calling you</p>
+      <button id="answerBtn">Answer</button>
+      <button id="rejectBtn">Reject</button>
+    </div>
+
+    <video id="localVideo" autoplay muted playsinline></video>
+    <video id="remoteVideo" autoplay playsinline></video>
   </div>
+</main>
 
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-  <script>
-    const socket = io('https://your-signaling-server.com'); // Replace with your signaling server
-    const userIdInput = document.getElementById('userId');
-    const targetIdInput = document.getElementById('targetId');
-    const localVideo = document.getElementById('localVideo');
-    const remoteVideo = document.getElementById('remoteVideo');
-    const popup = document.getElementById('incomingCallPopup');
-    const callerIdLabel = document.getElementById('callerIdLabel');
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<script>
+  const registerBtn = document.getElementById('registerBtn');
+  const emailInput = document.getElementById('emailInput');
+  const myIdDisplay = document.getElementById('myId');
+  const callSection = document.getElementById('callSection');
+  const callToInput = document.getElementById('callToInput');
+  const callBtn = document.getElementById('callBtn');
+  const incomingCallDiv = document.getElementById('incomingCall');
+  const callerIdLabel = document.getElementById('callerId');
+  const answerBtn = document.getElementById('answerBtn');
+  const rejectBtn = document.getElementById('rejectBtn');
+  const localVideo = document.getElementById('localVideo');
+  const remoteVideo = document.getElementById('remoteVideo');
 
-    let localStream;
-    let peerConnection;
-    let callerId = null;
+  let peer = null;
+  let conn = null;
+  let call = null;
+  let localStream = null;
 
-    const config = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' }
-      ]
-    };
+  // Save registered email in localStorage
+  function saveUserId(email) {
+    localStorage.setItem('novaPrimeUserId', email);
+  }
+  function getUserId() {
+    return localStorage.getItem('novaPrimeUserId');
+  }
 
-    async function setupMedia() {
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  // Setup media stream
+  async function setupMedia() {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
       localVideo.srcObject = localStream;
+    } catch(err) {
+      alert('Failed to get camera/mic access: ' + err);
     }
+  }
 
-    function startCall() {
-      callerId = userIdInput.value;
-      const targetId = targetIdInput.value;
-      if (!callerId || !targetId) return alert('Enter both IDs');
-
-      socket.emit('call', { from: callerId, to: targetId });
-    }
-
-    function answerCall() {
-      popup.style.display = 'none';
-      createPeerConnection();
-      setupMedia().then(() => {
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-        socket.emit('accept-call', { from: userIdInput.value, to: callerId });
-      });
-    }
-
-    function rejectCall() {
-      popup.style.display = 'none';
-      socket.emit('reject-call', { from: userIdInput.value, to: callerId });
-    }
-
-    function createPeerConnection() {
-      peerConnection = new RTCPeerConnection(config);
-      peerConnection.onicecandidate = event => {
-        if (event.candidate) {
-          socket.emit('ice-candidate', { to: callerId, candidate: event.candidate });
-        }
-      };
-      peerConnection.ontrack = event => {
-        remoteVideo.srcObject = event.streams[0];
-      };
-    }
-
-    socket.on('incoming-call', ({ from }) => {
-      callerId = from;
-      callerIdLabel.textContent = `${from} is calling you...`;
-      popup.style.display = 'block';
+  // Initialize PeerJS with userId
+  function initPeer(userId) {
+    peer = new Peer(userId, {
+      host: 'peerjs.com',
+      secure: true,
+      port: 443,
+      debug: 2
     });
 
-    socket.on('start-connection', async ({ from }) => {
-      callerId = from;
-      createPeerConnection();
+    peer.on('open', id => {
+      myIdDisplay.textContent = id;
+      console.log('My peer ID: ', id);
+    });
+
+    // When receiving a call
+    peer.on('call', async incomingCall => {
+      call = incomingCall;
+      callerIdLabel.textContent = call.peer;
+      incomingCallDiv.style.display = 'block';
       await setupMedia();
-      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      socket.emit('offer', { to: callerId, offer });
     });
 
-    socket.on('offer', async ({ offer }) => {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-      socket.emit('answer', { to: callerId, answer });
+    peer.on('error', err => {
+      alert('Peer error: ' + err);
+    });
+  }
+
+  registerBtn.onclick = () => {
+    const email = emailInput.value.trim().toLowerCase();
+    if (!email) return alert('Please enter a valid email');
+    saveUserId(email);
+    initPeer(email);
+    document.getElementById('registration').style.display = 'none';
+    callSection.style.display = 'block';
+  };
+
+  // If user is already registered, auto-init
+  window.onload = () => {
+    const savedId = getUserId();
+    if (savedId) {
+      emailInput.value = savedId;
+      initPeer(savedId);
+      document.getElementById('registration').style.display = 'none';
+      callSection.style.display = 'block';
+    }
+  };
+
+  callBtn.onclick = async () => {
+    const callTo = callToInput.value.trim().toLowerCase();
+    if (!callTo) return alert('Please enter an ID to call');
+
+    if (!localStream) await setupMedia();
+
+    call = peer.call(callTo, localStream);
+
+    call.on('stream', remoteStream => {
+      remoteVideo.srcObject = remoteStream;
     });
 
-    socket.on('answer', async ({ answer }) => {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    call.on('close', () => {
+      alert('Call ended.');
+      remoteVideo.srcObject = null;
     });
 
-    socket.on('ice-candidate', async ({ candidate }) => {
-      if (candidate) await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    call.on('error', err => {
+      alert('Call error: ' + err);
     });
-  </script>
+  };
+
+  answerBtn.onclick = () => {
+    incomingCallDiv.style.display = 'none';
+    call.answer(localStream);
+
+    call.on('stream', remoteStream => {
+      remoteVideo.srcObject = remoteStream;
+    });
+
+    call.on('close', () => {
+      alert('Call ended.');
+      remoteVideo.srcObject = null;
+    });
+
+    call.on('error', err => {
+      alert('Call error: ' + err);
+    });
+  };
+
+  rejectBtn.onclick = () => {
+    incomingCallDiv.style.display = 'none';
+    call.close();
+    call = null;
+  };
+</script>
 </body>
 </html>
