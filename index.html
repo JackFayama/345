@@ -2,196 +2,218 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NovaFX Video Call</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nova Prime Connect</title>
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #f3f4f6;
-      margin: 0; padding: 0;
-      display: flex; flex-direction: column;
-      align-items: center;
+      margin: 0;
+      padding: 0;
+      background-color: #f9fafb;
+    }
+    .navbar {
+      background-color: #22c55e;
+      color: white;
+      padding: 1rem;
+      font-size: 1.2rem;
+      font-weight: bold;
     }
     .container {
-      max-width: 500px;
-      background: #fff;
-      padding: 2rem;
-      border-radius: 12px;
-      margin-top: 2rem;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-      width: 90%;
+      padding: 1rem;
+      max-width: 1200px;
+      margin: auto;
     }
-    h2 {
-      color: #16a34a;
+    .auth, .call-controls {
+      margin-bottom: 2rem;
     }
     input, button {
-      width: 100%;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 8px;
+      padding: 0.5rem;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
       border: 1px solid #ccc;
+      border-radius: 6px;
     }
     button {
-      background: #16a34a;
+      background-color: #22c55e;
       color: white;
       font-weight: bold;
       cursor: pointer;
     }
     video {
       width: 100%;
-      margin-top: 10px;
-      border-radius: 10px;
+      max-height: 200px;
+      border-radius: 8px;
       background: black;
     }
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+    }
     .modal {
-      display: none;
       position: fixed;
-      top: 50%; left: 50%;
+      top: 50%;
+      left: 50%;
       transform: translate(-50%, -50%);
       background: white;
-      padding: 1.5rem;
+      padding: 2rem;
+      box-shadow: 0 0 20px rgba(0,0,0,0.2);
       border-radius: 12px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.3);
-      z-index: 999;
+      display: none;
+      z-index: 1000;
     }
-    .modal h3 {
-      margin-top: 0;
+    .modal.show {
+      display: block;
     }
   </style>
 </head>
 <body>
-
-  <div class="container" id="loginSection">
-    <h2>NovaFX Connect</h2>
-    <input type="email" id="email" placeholder="Enter your email to register/login">
-    <button onclick="login()">Login</button>
+  <div class="navbar">Nova Prime Connect</div>
+  <div class="container">
+    <div class="auth">
+      <input id="email" type="text" placeholder="Enter your email (jack@gmail.com)" />
+      <button onclick="login()">Login</button>
+    </div>
+    <div class="call-controls" style="display:none">
+      <p>Welcome, <span id="currentUser"></span></p>
+      <input id="peerId" type="text" placeholder="Enter email to call" />
+      <button onclick="callUser()">Call</button>
+      <button onclick="endCall()">End</button>
+      <button onclick="muteAudio()">Mute</button>
+      <button onclick="shareScreen()">Share Screen</button>
+      <button onclick="addCall()">Add Call</button>
+    </div>
+    <div class="video-grid" id="videoGrid"></div>
   </div>
 
-  <div class="container" id="callSection" style="display:none;">
-    <h3>Welcome: <span id="myIdDisplay"></span></h3>
-    <input type="text" id="targetId" placeholder="Enter recipient's email to call">
-    <button onclick="makeCall()">Call</button>
-    <video id="localVideo" autoplay muted playsinline></video>
-    <video id="remoteVideo" autoplay playsinline></video>
-  </div>
-
-  <!-- Modal -->
-  <div class="modal" id="popupModal">
-    <h3 id="modalTitle">Title</h3>
-    <p id="modalMessage">Message</p>
+  <div class="modal" id="modal">
+    <p id="modalMessage"></p>
     <button onclick="closeModal()">OK</button>
-  </div>
-
-  <!-- Incoming Call Modal -->
-  <div class="modal" id="incomingModal">
-    <h3>Incoming Call</h3>
-    <p id="callerEmail"></p>
-    <button onclick="acceptCall()">Accept</button>
-    <button onclick="declineCall()">Decline</button>
   </div>
 
   <script>
     const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
-    let localStream, currentCall, peer;
+    let currentUser = null;
+    let peer = null;
+    let localStream = null;
+    let currentCalls = {};
 
-    const loginSection = document.getElementById("loginSection");
-    const callSection = document.getElementById("callSection");
-    const myIdDisplay = document.getElementById("myIdDisplay");
-    const popupModal = document.getElementById("popupModal");
-    const modalTitle = document.getElementById("modalTitle");
-    const modalMessage = document.getElementById("modalMessage");
-
-    const incomingModal = document.getElementById("incomingModal");
-    const callerEmail = document.getElementById("callerEmail");
-
-    function showModal(title, message) {
-      modalTitle.innerText = title;
-      modalMessage.innerText = message;
-      popupModal.style.display = "block";
+    function showModal(message) {
+      document.getElementById('modalMessage').textContent = message;
+      document.getElementById('modal').classList.add('show');
     }
 
     function closeModal() {
-      popupModal.style.display = "none";
+      document.getElementById('modal').classList.remove('show');
     }
 
     function login() {
-      const email = document.getElementById("email").value.trim().toLowerCase();
-      if (!allowedEmails.includes(email)) {
-        showModal("Access Denied", "Only pre-approved emails are allowed.");
-        return;
-      }
-      localStorage.setItem("novaUser", email);
-      initPeer(email.replace(/[^a-z0-9]/gi, '')); // Safe ID
+      const email = document.getElementById('email').value.trim();
+      if (!allowedEmails.includes(email)) return showModal("Email not allowed.");
+      localStorage.setItem('novaUser', email);
+      document.getElementById('currentUser').textContent = email;
+      document.querySelector('.auth').style.display = 'none';
+      document.querySelector('.call-controls').style.display = 'block';
+      startPeer(email);
     }
 
-    function initPeer(cleanId) {
-      peer = new Peer(cleanId);
+    function startPeer(id) {
+      peer = new Peer(id, { debug: 2 });
 
-      peer.on("open", id => {
-        myIdDisplay.innerText = localStorage.getItem("novaUser");
-        loginSection.style.display = "none";
-        callSection.style.display = "block";
-        initMedia();
-      });
-
-      peer.on("call", call => {
-        currentCall = call;
-        callerEmail.innerText = `Call from ${call.peer}`;
-        incomingModal.style.display = "block";
-      });
-
-      peer.on("error", err => {
-        showModal("Peer Error", err.message);
-      });
-    }
-
-    function initMedia() {
       navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
           localStream = stream;
-          document.getElementById("localVideo").srcObject = stream;
-        })
-        .catch(() => {
-          showModal("Permission Denied", "Could not access camera/mic.");
+          addVideo(stream, 'Me');
         });
+
+      peer.on('call', call => {
+        call.answer(localStream);
+        call.on('stream', remoteStream => {
+          addVideo(remoteStream, call.peer);
+        });
+        call.on('close', () => removeVideo(call.peer));
+        currentCalls[call.peer] = call;
+      });
+
+      peer.on('disconnected', () => showModal("Disconnected from PeerJS server."));
     }
 
-    function makeCall() {
-      const target = document.getElementById("targetId").value.trim().toLowerCase();
-      if (!allowedEmails.includes(target)) {
-        showModal("Invalid Target", "That user is not in the allowed list.");
-        return;
+    function callUser() {
+      const targetId = document.getElementById('peerId').value.trim();
+      if (!targetId || targetId === currentUser) return showModal("Invalid target.");
+      const call = peer.call(targetId, localStream);
+      call.on('stream', remoteStream => {
+        addVideo(remoteStream, targetId);
+      });
+      call.on('close', () => {
+        removeVideo(targetId);
+        showModal(`${targetId} declined your call.`);
+      });
+      currentCalls[targetId] = call;
+    }
+
+    function endCall() {
+      for (let id in currentCalls) {
+        currentCalls[id].close();
+        removeVideo(id);
       }
-      const cleanTarget = target.replace(/[^a-z0-9]/gi, '');
-      const call = peer.call(cleanTarget, localStream);
-      call.on("stream", stream => {
-        document.getElementById("remoteVideo").srcObject = stream;
+      currentCalls = {};
+    }
+
+    function muteAudio() {
+      localStream.getAudioTracks().forEach(track => track.enabled = !track.enabled);
+    }
+
+    function shareScreen() {
+      navigator.mediaDevices.getDisplayMedia({ video: true }).then(screenStream => {
+        const screenTrack = screenStream.getVideoTracks()[0];
+        for (let id in currentCalls) {
+          let sender = currentCalls[id].peerConnection.getSenders().find(s => s.track.kind === 'video');
+          sender.replaceTrack(screenTrack);
+        }
+        screenTrack.onended = () => {
+          localStream.getVideoTracks().forEach(track => {
+            for (let id in currentCalls) {
+              let sender = currentCalls[id].peerConnection.getSenders().find(s => s.track.kind === 'video');
+              sender.replaceTrack(track);
+            }
+          });
+        };
       });
-      call.on("close", () => showModal("Call Ended", "The call was disconnected."));
     }
 
-    function acceptCall() {
-      incomingModal.style.display = "none";
-      currentCall.answer(localStream);
-      currentCall.on("stream", stream => {
-        document.getElementById("remoteVideo").srcObject = stream;
-      });
+    function addCall() {
+      callUser();
     }
 
-    function declineCall() {
-      incomingModal.style.display = "none";
-      currentCall.close();
+    function addVideo(stream, label) {
+      const videoGrid = document.getElementById('videoGrid');
+      const container = document.createElement('div');
+      const video = document.createElement('video');
+      const tag = document.createElement('p');
+      tag.textContent = label;
+      video.srcObject = stream;
+      video.autoplay = true;
+      video.playsInline = true;
+      container.appendChild(tag);
+      container.appendChild(video);
+      container.id = `video-${label}`;
+      videoGrid.appendChild(container);
     }
 
-    // Auto-login if stored
+    function removeVideo(label) {
+      const el = document.getElementById(`video-${label}`);
+      if (el) el.remove();
+    }
+
     window.onload = () => {
-      const user = localStorage.getItem("novaUser");
-      if (user && allowedEmails.includes(user)) {
-        document.getElementById("email").value = user;
-        initPeer(user.replace(/[^a-z0-9]/gi, ''));
+      const savedUser = localStorage.getItem('novaUser');
+      if (savedUser && allowedEmails.includes(savedUser)) {
+        document.getElementById('email').value = savedUser;
+        login();
       }
-    };
+    }
   </script>
 </body>
 </html>
