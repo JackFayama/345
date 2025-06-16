@@ -25,7 +25,7 @@
     h2 {
       color: #16a34a;
     }
-    input, button {
+    input, button, select {
       width: 100%;
       padding: 10px;
       margin: 10px 0;
@@ -58,6 +58,14 @@
     .modal h3 {
       margin-top: 0;
     }
+    .log-section, .contacts-section {
+      margin-top: 1rem;
+      text-align: left;
+    }
+    .log-entry {
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
   </style>
 </head>
 <body>
@@ -70,11 +78,19 @@
 
   <div class="container" id="callSection" style="display:none;">
     <h3>Welcome: <span id="myIdDisplay"></span></h3>
+    <select id="savedContacts"><option value="">Select saved contact</option></select>
     <input type="text" id="targetId" placeholder="Enter recipient's email to call">
     <button onclick="makeCall()">Call</button>
+    <button onclick="endCall()">End Call</button>
     <video id="localVideo" autoplay muted playsinline></video>
     <video id="remoteVideo" autoplay playsinline></video>
-    <button onclick="endCall()">End Call</button>
+    <div class="contacts-section">
+      <button onclick="saveCurrentContact()">Save This Contact</button>
+    </div>
+    <div class="log-section">
+      <h4>Call Logs</h4>
+      <div id="callLogs"></div>
+    </div>
   </div>
 
   <!-- Modal -->
@@ -102,9 +118,12 @@
     const popupModal = document.getElementById("popupModal");
     const modalTitle = document.getElementById("modalTitle");
     const modalMessage = document.getElementById("modalMessage");
-
     const incomingModal = document.getElementById("incomingModal");
     const callerEmail = document.getElementById("callerEmail");
+    const callLogsDiv = document.getElementById("callLogs");
+    const savedContacts = document.getElementById("savedContacts");
+
+    let myEmail = "";
 
     function showModal(title, message) {
       modalTitle.innerText = title;
@@ -116,14 +135,48 @@
       popupModal.style.display = "none";
     }
 
+    function addToLog(type, peerEmail) {
+      const logs = JSON.parse(localStorage.getItem("callLogs_" + myEmail)) || [];
+      logs.unshift(`${new Date().toLocaleString()} - ${type} with ${peerEmail}`);
+      localStorage.setItem("callLogs_" + myEmail, JSON.stringify(logs));
+      renderLogs();
+    }
+
+    function renderLogs() {
+      const logs = JSON.parse(localStorage.getItem("callLogs_" + myEmail)) || [];
+      callLogsDiv.innerHTML = logs.map(l => `<div class='log-entry'>${l}</div>`).join("");
+    }
+
+    function saveCurrentContact() {
+      const contact = document.getElementById("targetId").value.trim().toLowerCase();
+      if (contact && allowedEmails.includes(contact)) {
+        let saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
+        if (!saved.includes(contact)) {
+          saved.push(contact);
+          localStorage.setItem("contacts_" + myEmail, JSON.stringify(saved));
+          renderContacts();
+        }
+      }
+    }
+
+    function renderContacts() {
+      let saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
+      savedContacts.innerHTML = '<option value="">Select saved contact</option>' + saved.map(c => `<option value="${c}">${c}</option>`).join("");
+    }
+
+    savedContacts.addEventListener("change", () => {
+      document.getElementById("targetId").value = savedContacts.value;
+    });
+
     function login() {
       const email = document.getElementById("email").value.trim().toLowerCase();
       if (!allowedEmails.includes(email)) {
         showModal("Access Denied", "Only pre-approved emails are allowed.");
         return;
       }
+      myEmail = email;
       localStorage.setItem("novaUser", email);
-      initPeer(email.replace(/[^a-z0-9]/gi, '')); // Safe ID
+      initPeer(email.replace(/[^a-z0-9]/gi, ''));
     }
 
     function initPeer(cleanId) {
@@ -134,6 +187,8 @@
         loginSection.style.display = "none";
         callSection.style.display = "block";
         initMedia();
+        renderLogs();
+        renderContacts();
       });
 
       peer.on("call", call => {
@@ -167,10 +222,14 @@
       const cleanTarget = target.replace(/[^a-z0-9]/gi, '');
       const call = peer.call(cleanTarget, localStream);
       currentCall = call;
+      addToLog("Outgoing Call", target);
       call.on("stream", stream => {
         document.getElementById("remoteVideo").srcObject = stream;
       });
-      call.on("close", () => showModal("Call Ended", "The call was disconnected."));
+      call.on("close", () => {
+        showModal("Call Ended", `Call with ${target} has ended.`);
+        addToLog("Call Ended", target);
+      });
     }
 
     function acceptCall() {
@@ -179,40 +238,35 @@
       currentCall.on("stream", stream => {
         document.getElementById("remoteVideo").srcObject = stream;
       });
+      addToLog("Incoming Call (Accepted)", currentCall.peer);
     }
 
     function declineCall() {
       incomingModal.style.display = "none";
-      showModal("Call Declined", `${currentCall.peer} declined your call.`);
+      showModal("Call Declined", `You declined the call from ${currentCall.peer}`);
+      peer.connect(currentCall.peer).on("open", function(conn) {
+        conn.send("CALL_DECLINED");
+      });
       currentCall.close();
+      addToLog("Incoming Call (Declined)", currentCall.peer);
     }
 
     function endCall() {
       if (currentCall) {
         currentCall.close();
-        currentCall = null;
-        document.getElementById("remoteVideo").srcObject = null;
         showModal("Call Ended", "You ended the call.");
+        addToLog("Call Ended", currentCall.peer);
       }
     }
 
-    // Auto-login if stored
     window.onload = () => {
       const user = localStorage.getItem("novaUser");
       if (user && allowedEmails.includes(user)) {
         document.getElementById("email").value = user;
+        myEmail = user;
         initPeer(user.replace(/[^a-z0-9]/gi, ''));
       }
     };
-  </script>
-
-  <script>
-    // Service worker registration for PWA + notification stub (to be enhanced with Firebase or other service)
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(reg => console.log('Service Worker registered.'))
-        .catch(err => console.error('Service Worker error:', err));
-    }
   </script>
 </body>
 </html>
