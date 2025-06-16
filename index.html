@@ -2,221 +2,223 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NovaFX Voice/Video Call</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaFX Voice & Video</title>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <style>
     body {
-      margin: 0;
       font-family: 'Segoe UI', sans-serif;
+      margin: 0;
       background: #f1f5f9;
       color: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
     }
     .navbar {
-      background-color: #22c55e;
+      background-color: #16a34a;
       color: white;
       padding: 1rem;
       font-weight: bold;
+      font-size: 1.2rem;
+      width: 100%;
+      text-align: left;
     }
     .container {
-      padding: 1rem;
-      max-width: 600px;
-      margin: auto;
+      max-width: 500px;
+      background: white;
+      padding: 1.5rem;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      margin-top: 1rem;
+      width: 100%;
     }
     .input-group {
       margin-bottom: 1rem;
     }
-    .input-group label {
-      display: block;
-      margin-bottom: 0.3rem;
-    }
-    .input-group input {
+    input {
       width: 100%;
-      padding: 0.5rem;
-      border-radius: 5px;
+      padding: 0.7rem;
       border: 1px solid #ccc;
+      border-radius: 8px;
     }
-    .btn {
-      background-color: #22c55e;
+    button {
+      padding: 0.7rem 1.2rem;
+      background: #16a34a;
       color: white;
-      padding: 0.6rem 1.2rem;
-      border: none;
-      border-radius: 6px;
       font-weight: bold;
+      border: none;
+      border-radius: 8px;
       cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    video {
+      width: 100%;
+      border-radius: 10px;
+      background: black;
     }
     .video-grid {
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      margin-top: 1rem;
     }
-    video {
-      width: 100%;
-      border-radius: 10px;
-      background: #000;
-    }
-    @media(min-width: 640px) {
+    @media(min-width: 768px) {
       .video-grid {
         flex-direction: row;
       }
     }
     .modal {
-      display: none;
       position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-    .modal-content {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       background: white;
-      padding: 2rem;
-      border-radius: 10px;
-      text-align: center;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+      z-index: 9999;
+      display: none;
     }
-    .modal-content h2 {
-      margin-top: 0;
+    .modal h2 { margin-top: 0; }
+    .modal button {
+      margin-top: 1rem;
     }
   </style>
 </head>
 <body>
   <div class="navbar">NovaFX Connect</div>
-  <div class="container" id="authContainer">
+
+  <div class="container" id="loginSection">
     <div class="input-group">
-      <label>Email (Use: jack@gmail.com, nelima@gmail.com, judith@gmail.com)</label>
-      <input type="email" id="emailInput" />
+      <label>Email (ID):</label>
+      <input type="email" id="email" placeholder="Enter your email" />
     </div>
-    <button class="btn" onclick="login()">Login</button>
+    <button onclick="login()">Login</button>
   </div>
 
-  <div class="container" id="callContainer" style="display:none">
-    <p><strong>Logged in as:</strong> <span id="currentUser"></span></p>
+  <div class="container" id="chatSection" style="display:none;">
+    <p>Your ID: <strong id="myIdDisplay"></strong></p>
     <div class="input-group">
-      <label>Call Email</label>
-      <input type="email" id="targetInput" placeholder="e.g. nelima@gmail.com"/>
+      <input type="text" id="targetId" placeholder="Enter email to call" />
     </div>
-    <button class="btn" onclick="startCall()">Call</button>
+    <button onclick="makeCall()">Call</button>
 
-    <div class="video-grid">
+    <div class="video-grid" style="margin-top:1rem;">
       <video id="localVideo" autoplay muted playsinline></video>
       <video id="remoteVideo" autoplay playsinline></video>
     </div>
   </div>
 
   <div class="modal" id="modal">
-    <div class="modal-content">
-      <h2 id="modalTitle">Title</h2>
-      <p id="modalMessage">Message</p>
-      <button class="btn" onclick="closeModal()">OK</button>
-    </div>
+    <h2 id="modalTitle"></h2>
+    <p id="modalMessage"></p>
+    <button onclick="closeModal()">OK</button>
   </div>
 
-  <div class="modal" id="incomingModal">
-    <div class="modal-content">
-      <h2>Incoming Call</h2>
-      <p id="incomingText">Someone is calling...</p>
-      <button class="btn" onclick="acceptCall()">Accept</button>
-      <button class="btn" onclick="closeIncoming()">Reject</button>
-    </div>
+  <div class="modal" id="incomingCallModal">
+    <h2>Incoming Call</h2>
+    <p id="incomingFrom"></p>
+    <button onclick="acceptCall()">Accept</button>
+    <button onclick="declineCall()">Decline</button>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
     const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
-    const emailInput = document.getElementById('emailInput');
-    const targetInput = document.getElementById('targetInput');
-    const currentUser = document.getElementById('currentUser');
     const localVideo = document.getElementById('localVideo');
     const remoteVideo = document.getElementById('remoteVideo');
-    const authContainer = document.getElementById('authContainer');
-    const callContainer = document.getElementById('callContainer');
+    const loginSection = document.getElementById('loginSection');
+    const chatSection = document.getElementById('chatSection');
+    const myIdDisplay = document.getElementById('myIdDisplay');
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modalTitle');
     const modalMessage = document.getElementById('modalMessage');
-    const incomingModal = document.getElementById('incomingModal');
-    const incomingText = document.getElementById('incomingText');
+    const incomingCallModal = document.getElementById('incomingCallModal');
+    const incomingFrom = document.getElementById('incomingFrom');
 
-    let localStream, peer, currentEmail, currentCall;
+    let peer, localStream, currentCall;
 
     function showModal(title, message) {
       modalTitle.textContent = title;
       modalMessage.textContent = message;
-      modal.style.display = 'flex';
+      modal.style.display = 'block';
     }
 
     function closeModal() {
       modal.style.display = 'none';
     }
 
-    function closeIncoming() {
-      incomingModal.style.display = 'none';
-      if (currentCall) currentCall.close();
-    }
-
     function login() {
-      const email = emailInput.value.trim().toLowerCase();
+      const email = document.getElementById('email').value.trim().toLowerCase();
       if (!allowedEmails.includes(email)) {
-        showModal('Access Denied', 'Only registered users can log in.');
-        return;
+        return showModal("Access Denied", "Only pre-approved IDs can login.");
       }
-      currentEmail = email;
-      localStorage.setItem('nova_user', email);
-      initPeer(email);
-      authContainer.style.display = 'none';
-      callContainer.style.display = 'block';
-      currentUser.textContent = email;
+      localStorage.setItem("novaUserEmail", email);
+      startPeer(email);
     }
 
-    function initPeer(id) {
+    function startPeer(id) {
       peer = new Peer(id, {
-        host: 'peerjs.com',
-        port: 443,
-        secure: true
+        debug: 2
       });
 
-      peer.on('open', () => {
-        console.log('Connected as', id);
+      peer.on('open', id => {
+        myIdDisplay.textContent = id;
+        loginSection.style.display = 'none';
+        chatSection.style.display = 'block';
+        getMedia();
       });
 
-      peer.on('call', async (call) => {
+      peer.on('call', call => {
         currentCall = call;
-        incomingText.textContent = `${call.peer} is calling...`;
-        incomingModal.style.display = 'flex';
-        window.acceptCall = async () => {
-          incomingModal.style.display = 'none';
-          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          localVideo.srcObject = localStream;
-          call.answer(localStream);
-          call.on('stream', (remoteStream) => {
-            remoteVideo.srcObject = remoteStream;
-          });
-        };
+        incomingFrom.textContent = `Call from ${call.peer}`;
+        incomingCallModal.style.display = 'block';
       });
     }
 
-    async function startCall() {
-      const targetId = targetInput.value.trim().toLowerCase();
-      if (!allowedEmails.includes(targetId)) {
-        showModal('Invalid ID', 'Target user not registered.');
-        return;
+    function getMedia() {
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(stream => {
+          localStream = stream;
+          localVideo.srcObject = stream;
+        })
+        .catch(() => showModal("Error", "Could not access camera/mic"));
+    }
+
+    function makeCall() {
+      const target = document.getElementById('targetId').value.trim().toLowerCase();
+      if (!allowedEmails.includes(target)) {
+        return showModal("User Not Found", "Target email is not allowed.");
       }
+      const call = peer.call(target, localStream);
+      handleCallStream(call);
+    }
 
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localVideo.srcObject = localStream;
+    function acceptCall() {
+      incomingCallModal.style.display = 'none';
+      currentCall.answer(localStream);
+      handleCallStream(currentCall);
+    }
 
-      const call = peer.call(targetId, localStream);
-      call.on('stream', (remoteStream) => {
-        remoteVideo.srcObject = remoteStream;
+    function declineCall() {
+      incomingCallModal.style.display = 'none';
+      currentCall.close();
+    }
+
+    function handleCallStream(call) {
+      call.on('stream', stream => {
+        remoteVideo.srcObject = stream;
       });
+      call.on('close', () => showModal("Call Ended", "The call has been disconnected."));
     }
 
-    // Auto-login if previously registered
-    const savedUser = localStorage.getItem('nova_user');
-    if (savedUser && allowedEmails.includes(savedUser)) {
-      emailInput.value = savedUser;
-      login();
-    }
+    window.onload = () => {
+      const email = localStorage.getItem("novaUserEmail");
+      if (email && allowedEmails.includes(email)) {
+        document.getElementById('email').value = email;
+        startPeer(email);
+      }
+    };
   </script>
 </body>
 </html>
