@@ -3,23 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Nova Prime Connect</title>
+  <title>NovaFX Voice/Video Call</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
       margin: 0;
-      background: #f0fdf4;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f1f5f9;
+      color: #111;
     }
     .navbar {
       background-color: #22c55e;
       color: white;
       padding: 1rem;
       font-weight: bold;
-      font-size: 1.25rem;
     }
     .container {
       padding: 1rem;
-      max-width: 700px;
+      max-width: 600px;
       margin: auto;
     }
     .input-group {
@@ -28,13 +28,12 @@
     .input-group label {
       display: block;
       margin-bottom: 0.3rem;
-      font-weight: 500;
     }
     .input-group input {
       width: 100%;
-      padding: 0.6rem;
+      padding: 0.5rem;
+      border-radius: 5px;
       border: 1px solid #ccc;
-      border-radius: 6px;
     }
     .btn {
       background-color: #22c55e;
@@ -42,8 +41,8 @@
       padding: 0.6rem 1.2rem;
       border: none;
       border-radius: 6px;
-      cursor: pointer;
       font-weight: bold;
+      cursor: pointer;
     }
     .video-grid {
       display: flex;
@@ -51,54 +50,53 @@
       gap: 1rem;
       margin-top: 1rem;
     }
+    video {
+      width: 100%;
+      border-radius: 10px;
+      background: #000;
+    }
     @media(min-width: 640px) {
       .video-grid {
         flex-direction: row;
       }
     }
-    video {
-      width: 100%;
-      border-radius: 12px;
-      background: black;
-    }
     .modal {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
       display: none;
-      align-items: center;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
       justify-content: center;
-      z-index: 9999;
+      align-items: center;
+      z-index: 1000;
     }
     .modal-content {
       background: white;
       padding: 2rem;
       border-radius: 10px;
-      max-width: 300px;
       text-align: center;
     }
-    .modal h2 {
+    .modal-content h2 {
       margin-top: 0;
-    }
-    .hidden {
-      display: none;
     }
   </style>
 </head>
 <body>
-  <div class="navbar">Nova Prime Connect</div>
-  <div class="container">
+  <div class="navbar">NovaFX Connect</div>
+  <div class="container" id="authContainer">
     <div class="input-group">
-      <label>Email (used as ID)</label>
-      <input type="email" id="email" placeholder="Enter your email" />
+      <label>Email (Use: jack@gmail.com, nelima@gmail.com, judith@gmail.com)</label>
+      <input type="email" id="emailInput" />
     </div>
-    <button class="btn" onclick="register()">Register</button>
+    <button class="btn" onclick="login()">Login</button>
+  </div>
 
-    <div class="input-group hidden" id="callSection">
-      <label>Call Peer ID (Email)</label>
-      <input type="text" id="targetId" placeholder="Target email" />
-      <button class="btn" onclick="startCall()">Call</button>
+  <div class="container" id="callContainer" style="display:none">
+    <p><strong>Logged in as:</strong> <span id="currentUser"></span></p>
+    <div class="input-group">
+      <label>Call Email</label>
+      <input type="email" id="targetInput" placeholder="e.g. nelima@gmail.com"/>
     </div>
+    <button class="btn" onclick="startCall()">Call</button>
 
     <div class="video-grid">
       <video id="localVideo" autoplay muted playsinline></video>
@@ -106,109 +104,119 @@
     </div>
   </div>
 
-  <!-- Modal for alerts -->
-  <div class="modal" id="alertModal">
+  <div class="modal" id="modal">
     <div class="modal-content">
-      <h2 id="alertText">Alert</h2>
+      <h2 id="modalTitle">Title</h2>
+      <p id="modalMessage">Message</p>
       <button class="btn" onclick="closeModal()">OK</button>
     </div>
   </div>
 
-  <!-- Modal for incoming calls -->
   <div class="modal" id="incomingModal">
     <div class="modal-content">
       <h2>Incoming Call</h2>
-      <p id="incomingFrom"></p>
+      <p id="incomingText">Someone is calling...</p>
       <button class="btn" onclick="acceptCall()">Accept</button>
-      <button class="btn" onclick="declineCall()">Decline</button>
+      <button class="btn" onclick="closeIncoming()">Reject</button>
     </div>
   </div>
 
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    let peer, localStream, currentCall, localId;
-
-    const emailInput = document.getElementById('email');
-    const targetInput = document.getElementById('targetId');
-    const callSection = document.getElementById('callSection');
-    const alertModal = document.getElementById('alertModal');
-    const alertText = document.getElementById('alertText');
-    const incomingModal = document.getElementById('incomingModal');
-    const incomingFrom = document.getElementById('incomingFrom');
+    const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
+    const emailInput = document.getElementById('emailInput');
+    const targetInput = document.getElementById('targetInput');
+    const currentUser = document.getElementById('currentUser');
     const localVideo = document.getElementById('localVideo');
     const remoteVideo = document.getElementById('remoteVideo');
+    const authContainer = document.getElementById('authContainer');
+    const callContainer = document.getElementById('callContainer');
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const incomingModal = document.getElementById('incomingModal');
+    const incomingText = document.getElementById('incomingText');
 
-    function showModal(message) {
-      alertText.innerText = message;
-      alertModal.style.display = 'flex';
+    let localStream, peer, currentEmail, currentCall;
+
+    function showModal(title, message) {
+      modalTitle.textContent = title;
+      modalMessage.textContent = message;
+      modal.style.display = 'flex';
     }
 
     function closeModal() {
-      alertModal.style.display = 'none';
+      modal.style.display = 'none';
     }
 
-    function register() {
+    function closeIncoming() {
+      incomingModal.style.display = 'none';
+      if (currentCall) currentCall.close();
+    }
+
+    function login() {
       const email = emailInput.value.trim().toLowerCase();
-      if (!email) return showModal('Enter a valid email');
+      if (!allowedEmails.includes(email)) {
+        showModal('Access Denied', 'Only registered users can log in.');
+        return;
+      }
+      currentEmail = email;
+      localStorage.setItem('nova_user', email);
+      initPeer(email);
+      authContainer.style.display = 'none';
+      callContainer.style.display = 'block';
+      currentUser.textContent = email;
+    }
 
-      localId = email;
-      localStorage.setItem('novaUserEmail', localId);
-
-      peer = new Peer(localId);
+    function initPeer(id) {
+      peer = new Peer(id, {
+        host: 'peerjs.com',
+        port: 443,
+        secure: true
+      });
 
       peer.on('open', () => {
-        callSection.classList.remove('hidden');
-        showModal(`Registered as ${localId}`);
+        console.log('Connected as', id);
       });
 
-      peer.on('error', err => {
-        showModal(`Peer error: ${err.type}`);
-      });
-
-      peer.on('call', async call => {
-        incomingFrom.innerText = `Call from ${call.peer}`;
-        incomingModal.style.display = 'flex';
+      peer.on('call', async (call) => {
         currentCall = call;
+        incomingText.textContent = `${call.peer} is calling...`;
+        incomingModal.style.display = 'flex';
+        window.acceptCall = async () => {
+          incomingModal.style.display = 'none';
+          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          localVideo.srcObject = localStream;
+          call.answer(localStream);
+          call.on('stream', (remoteStream) => {
+            remoteVideo.srcObject = remoteStream;
+          });
+        };
       });
-    }
-
-    async function acceptCall() {
-      incomingModal.style.display = 'none';
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localVideo.srcObject = localStream;
-
-      currentCall.answer(localStream);
-      currentCall.on('stream', remoteStream => {
-        remoteVideo.srcObject = remoteStream;
-      });
-    }
-
-    function declineCall() {
-      incomingModal.style.display = 'none';
-      currentCall && currentCall.close();
     }
 
     async function startCall() {
       const targetId = targetInput.value.trim().toLowerCase();
-      if (!targetId || !peer) return showModal('Enter target email and register first');
+      if (!allowedEmails.includes(targetId)) {
+        showModal('Invalid ID', 'Target user not registered.');
+        return;
+      }
 
       localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localVideo.srcObject = localStream;
 
       const call = peer.call(targetId, localStream);
-      call.on('stream', remoteStream => {
+      call.on('stream', (remoteStream) => {
         remoteVideo.srcObject = remoteStream;
       });
     }
 
-    // Auto-load if previously registered
-    window.onload = () => {
-      const savedEmail = localStorage.getItem('novaUserEmail');
-      if (savedEmail) {
-        emailInput.value = savedEmail;
-        register();
-      }
-    };
+    // Auto-login if previously registered
+    const savedUser = localStorage.getItem('nova_user');
+    if (savedUser && allowedEmails.includes(savedUser)) {
+      emailInput.value = savedUser;
+      login();
+    }
   </script>
 </body>
 </html>
