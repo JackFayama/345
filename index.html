@@ -165,9 +165,7 @@
 const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
 let localStream, currentCall, peer, myEmail = "";
 let connections = [];
-let isMuted = false;
-let isScreenSharing = false;
-let screenStream;
+let ringtone;
 
 function showModal(title, message) {
   document.getElementById("modalTitle").innerText = title;
@@ -197,14 +195,46 @@ function initPeer(cleanId) {
     document.getElementById("loginSection").style.display = "none";
     document.getElementById("callSection").style.display = "block";
     initMedia();
-    renderLogs();
     renderContacts();
   });
 
   peer.on("call", call => {
     currentCall = call;
-    document.getElementById("callerEmail").innerText = `Call from ${call.peer}`;
-    document.getElementById("incomingModal").style.display = "block";
+    showIncoming(call.peer);
+    ringtone.play();
+
+    const autoDeclineTimer = setTimeout(() => {
+      if (document.getElementById("incomingModal").style.display === "block") {
+        ringtone.pause();
+        ringtone.currentTime = 0;
+        hideIncoming();
+        showModal("Missed Call", `You missed a call from ${call.peer}`);
+        call.close();
+        logCall(call.peer, "Missed");
+      }
+    }, 20000);
+
+    document.getElementById("acceptCall").onclick = () => {
+      clearTimeout(autoDeclineTimer);
+      ringtone.pause();
+      ringtone.currentTime = 0;
+      call.answer(localStream);
+      call.on('stream', remoteStream => {
+        document.getElementById("remoteVideo").srcObject = remoteStream;
+      });
+      hideIncoming();
+      logCall(call.peer, "Incoming");
+    };
+
+    document.getElementById("declineCall").onclick = () => {
+      clearTimeout(autoDeclineTimer);
+      ringtone.pause();
+      ringtone.currentTime = 0;
+      hideIncoming();
+      call.close();
+      showModal("Missed Call", `You missed a call from ${call.peer}`);
+      logCall(call.peer, "Missed");
+    };
   });
 
   peer.on("connection", conn => {
@@ -239,105 +269,48 @@ function makeCall() {
   const call = peer.call(cleanTarget, localStream);
   currentCall = call;
   connections.push(call);
-  addToLog("Outgoing Call", target);
+  logCall(target, "Outgoing");
+
   call.on("stream", stream => {
     document.getElementById("remoteVideo").srcObject = stream;
   });
+
   call.on("close", () => {
     showModal("Call Ended", `Call with ${target} ended.`);
-    addToLog("Call Ended", target);
   });
-}
-
-function acceptCall() {
-  document.getElementById("incomingModal").style.display = "none";
-  currentCall.answer(localStream);
-  currentCall.on("stream", stream => {
-    document.getElementById("remoteVideo").srcObject = stream;
-  });
-  addToLog("Incoming Call (Accepted)", currentCall.peer);
-}
-
-function declineCall() {
-  document.getElementById("incomingModal").style.display = "none";
-  peer.connect(currentCall.peer).on("open", conn => conn.send("CALL_DECLINED"));
-  currentCall.close();
-  addToLog("Incoming Call (Declined)", currentCall.peer);
 }
 
 function endCall() {
   if (currentCall) {
     currentCall.close();
+    document.getElementById("remoteVideo").srcObject = null;
     showModal("Call Ended", "You ended the call.");
-    addToLog("Call Ended", currentCall.peer);
   }
   connections.forEach(c => c.close());
   connections = [];
 }
 
-function toggleMute() {
-  if (!localStream) return;
-  isMuted = !isMuted;
-  localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+function showIncoming(email) {
+  document.getElementById("incomingModal").style.display = "block";
+  document.getElementById("callerEmail").innerText = email;
 }
 
-function shareScreen() {
-  if (isScreenSharing) {
-    localStream.getVideoTracks()[0].stop();
-    initMedia();
-    isScreenSharing = false;
-  } else {
-    navigator.mediaDevices.getDisplayMedia({ video: true })
-      .then(screen => {
-        screenStream = screen;
-        localStream.getVideoTracks().forEach(t => t.stop());
-        localStream.removeTrack(localStream.getVideoTracks()[0]);
-        localStream.addTrack(screen.getVideoTracks()[0]);
-        document.getElementById("localVideo").srcObject = screen;
-        isScreenSharing = true;
-      }).catch(() => {
-        showModal("Error", "Screen sharing was cancelled.");
-      });
-  }
+function hideIncoming() {
+  document.getElementById("incomingModal").style.display = "none";
 }
 
-function addUserToCall() {
-  const email = document.getElementById("addUserEmail").value.trim().toLowerCase();
-  if (!allowedEmails.includes(email)) {
-    showModal("Invalid User", "That user is not allowed.");
-    return;
-  }
-  const id = email.replace(/[^a-z0-9]/gi, '');
-  const call = peer.call(id, localStream);
-  connections.push(call);
-  addToLog("Group Call", email);
-  call.on("stream", stream => {
-    document.getElementById("remoteVideo").srcObject = stream;
+function logCall(contact, type) {
+  const time = new Date().toLocaleTimeString();
+  const log = document.createElement("div");
+  log.className = "call-log";
+  log.innerText = `[${type}] ${contact} @ ${time}`;
+  const callLogsDiv = document.getElementById("callLogs");
+  callLogsDiv.prepend(log);
+
+  const allLogs = document.querySelectorAll(".call-log");
+  allLogs.forEach((log, index) => {
+    log.style.display = index < 3 ? "block" : "none";
   });
-}
-
-function addToLog(type, peerEmail) {
-  const logs = JSON.parse(localStorage.getItem("callLogs_" + myEmail)) || [];
-  logs.unshift(`${new Date().toLocaleString()} - ${type} with ${peerEmail}`);
-  localStorage.setItem("callLogs_" + myEmail, JSON.stringify(logs));
-  renderLogs();
-}
-
-function renderLogs() {
-  const logs = JSON.parse(localStorage.getItem("callLogs_" + myEmail)) || [];
-  document.getElementById("callLogs").innerHTML = logs.map(l => `<div class='log-entry'>${l}</div>`).join("");
-}
-
-function saveCurrentContact() {
-  const contact = document.getElementById("targetId").value.trim().toLowerCase();
-  if (contact && allowedEmails.includes(contact)) {
-    let saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
-    if (!saved.includes(contact)) {
-      saved.push(contact);
-      localStorage.setItem("contacts_" + myEmail, JSON.stringify(saved));
-      renderContacts();
-    }
-  }
 }
 
 function renderContacts() {
@@ -352,6 +325,7 @@ document.getElementById("savedContacts").addEventListener("change", () => {
 });
 
 window.onload = () => {
+  ringtone = document.getElementById('ringtone');
   const user = localStorage.getItem("novaUser");
   if (user && allowedEmails.includes(user)) {
     document.getElementById("email").value = user;
@@ -360,5 +334,6 @@ window.onload = () => {
   }
 };
 </script>
+
 </body>
 </html>
