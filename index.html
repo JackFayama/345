@@ -3,48 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NovaFX Video Call</title>
+  <title>NovaFX Call</title>
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
       background: #f3f4f6;
       margin: 0;
-      padding-top: 80px; /* Space for fixed header */
+      padding: 0;
     }
-    .header-fixed {
+
+    .topbar {
       position: fixed;
       top: 0;
       width: 100%;
-      z-index: 1000;
-      background: #1e5e4b;
+      background: #16a34a;
       color: white;
-    }
-    .header-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 16px;
+      padding: 0.6rem 1rem;
       font-weight: bold;
+      text-align: center;
+      z-index: 999;
     }
+
     .welcome-bar {
-      display: flex;
-      align-items: center;
-      padding: 8px 16px;
-      background: #256d5a;
-      gap: 8px;
-    }
-    .welcome-avatar {
-      background: #9333ea;
-      border-radius: 50%;
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 14px;
-      font-weight: bold;
+      margin-top: 2.8rem;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 500;
+      color: #16a34a;
     }
 
     .container {
@@ -53,15 +39,14 @@
       padding: 1.2rem;
       border-radius: 12px;
       margin: 1rem auto;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-      width: 90%;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
     }
 
     input, select {
       width: 100%;
-      padding: 8px;
-      margin-top: 8px;
-      border-radius: 6px;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
       border: 1px solid #ccc;
     }
 
@@ -86,11 +71,13 @@
       overflow: hidden;
       margin-top: 10px;
     }
+
     #remoteVideo {
       width: 100%;
       height: 100%;
       object-fit: cover;
     }
+
     #localVideo {
       position: absolute;
       bottom: 10px;
@@ -105,17 +92,15 @@
 
     .btn-group {
       display: flex;
-      justify-content: center;
-      gap: 10px;
       flex-wrap: wrap;
+      gap: 10px;
       margin-top: 10px;
     }
 
     .modal {
       display: none;
       position: fixed;
-      top: 50%;
-      left: 50%;
+      top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       background: white;
       padding: 1.5rem;
@@ -133,25 +118,25 @@
       border-left: 4px solid #16a34a;
     }
 
-    #callLogs > .call-log:nth-child(n+4) {
-      display: none;
+    .row-flex {
+      display: flex;
+      gap: 10px;
     }
 
-    .input-row {
-      display: flex;
-      gap: 6px;
-      margin-top: 10px;
+    .row-flex > input {
+      flex: 2;
+    }
+
+    .row-flex > button {
+      flex: 1;
     }
 
     @media (max-width: 640px) {
-      .video-wrapper {
-        height: 200px;
-      }
       #localVideo {
         width: 90px;
         height: 70px;
       }
-      .input-row {
+      .row-flex {
         flex-direction: column;
       }
     }
@@ -159,185 +144,168 @@
 </head>
 <body>
 
-<!-- Fixed Header -->
-<div class="header-fixed">
-  <div class="header-top">
-    <span>NovaNET</span>
+  <div class="topbar">NovaNET Video Call</div>
+  <div class="welcome-bar" id="welcomeText">Welcome!</div>
+
+  <div class="container" id="loginSection">
+    <input type="email" id="email" placeholder="Enter your email to register/login">
+    <button onclick="login()">Login</button>
   </div>
-  <div class="welcome-bar">
-    <div id="userInitial" class="welcome-avatar">J</div>
-    <span id="welcomeText">Welcome!</span>
-  </div>
-</div>
 
-<!-- Login Section -->
-<div class="container" id="loginSection">
-  <h2>NovaFX Connect</h2>
-  <input type="email" id="email" placeholder="Enter your email to register/login">
-  <button onclick="login()">Login</button>
-</div>
+  <div class="container" id="callSection" style="display:none;">
+    <h3>You are: <span id="myIdDisplay"></span></h3>
 
-<!-- Call Section -->
-<div class="container" id="callSection" style="display:none;">
-  <h3>ID: <span id="myIdDisplay"></span></h3>
-
-  <div class="input-row">
-    <select id="savedContacts">
-      <option value="">Select contact</option>
+    <select id="savedContacts" onchange="document.getElementById('targetId').value=this.value;">
+      <option value="">Select saved contact</option>
     </select>
-    <input type="text" id="targetId" placeholder="Recipient's email">
+
+    <div class="row-flex">
+      <input type="text" id="targetId" placeholder="Enter recipient email">
+      <button onclick="makeCall()">📞 Call</button>
+    </div>
+
+    <button onclick="endCall()">❌ End Call</button>
+
+    <div class="video-wrapper">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <video id="localVideo" autoplay muted playsinline></video>
+    </div>
+
+    <div>
+      <h4>Call Logs</h4>
+      <div id="callLogs"></div>
+    </div>
   </div>
 
-  <div class="btn-group">
-    <button onclick="makeCall()">📞 Call</button>
-    <button onclick="endCall()">❌ End</button>
+  <!-- Feedback Modal -->
+  <div class="modal" id="popupModal">
+    <h3 id="modalTitle">Title</h3>
+    <p id="modalMessage">Message</p>
+    <button onclick="closeModal()">OK</button>
   </div>
 
-  <div class="video-wrapper">
-    <video id="remoteVideo" autoplay playsinline></video>
-    <video id="localVideo" autoplay muted playsinline></video>
+  <!-- Incoming Call Modal -->
+  <div class="modal" id="incomingModal">
+    <h3>Incoming Call</h3>
+    <p id="callerEmail"></p>
+    <div class="btn-group">
+      <button id="acceptCall">Accept</button>
+      <button id="declineCall">Decline</button>
+    </div>
   </div>
 
-  <div>
-    <h4>Call Logs</h4>
-    <div id="callLogs"></div>
-  </div>
-</div>
+  <!-- Ringtone -->
+  <audio id="ringtone" src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg" preload="auto"></audio>
 
-<!-- Feedback Modal -->
-<div class="modal" id="popupModal">
-  <h3 id="modalTitle">Title</h3>
-  <p id="modalMessage">Message</p>
-  <button onclick="closeModal()">OK</button>
-</div>
+  <script>
+    const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
+    let currentUser = "";
 
-<!-- Incoming Call Modal -->
-<div class="modal" id="incomingModal">
-  <h3>Incoming Call</h3>
-  <p id="callerEmail"></p>
-  <div class="btn-group">
-    <button id="acceptCall">Accept</button>
-    <button id="declineCall">Decline</button>
-  </div>
-</div>
+    function login() {
+      const email = document.getElementById("email").value.trim().toLowerCase();
+      if (!allowedEmails.includes(email)) {
+        showModal("Access Denied", "Only registered NovaNET users can login.");
+        return;
+      }
 
-<audio id="ringtone" src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg" preload="auto"></audio>
+      localStorage.setItem("novanetUser", email);
+      currentUser = email;
+      document.getElementById("loginSection").style.display = "none";
+      document.getElementById("callSection").style.display = "block";
 
-<script>
-  const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
-  let currentUser = "";
+      const namePart = email.split('@')[0];
+      document.getElementById("myIdDisplay").innerText = email;
+      document.getElementById("welcomeText").innerText = `Welcome ${namePart}!`;
 
-  function login() {
-    const email = document.getElementById("email").value.trim().toLowerCase();
-    if (!allowedEmails.includes(email)) {
-      showModal("Access Denied", "Only registered NovaNET users can login.");
-      return;
-    }
+      const contacts = allowedEmails.filter(e => e !== email);
+      const dropdown = document.getElementById("savedContacts");
+      contacts.forEach(e => {
+        const opt = document.createElement("option");
+        opt.value = e;
+        opt.textContent = e;
+        dropdown.appendChild(opt);
+      });
 
-    localStorage.setItem("novanetUser", email);
-    currentUser = email;
-    document.getElementById("loginSection").style.display = "none";
-    document.getElementById("callSection").style.display = "block";
+      const peer = new Peer(email, { debug: 2 });
+      const localVideo = document.getElementById("localVideo");
+      const remoteVideo = document.getElementById("remoteVideo");
+      let currentCall = null;
 
-    const namePart = email.split('@')[0];
-    document.getElementById("myIdDisplay").innerText = email;
-    document.getElementById("userInitial").innerText = namePart.charAt(0).toUpperCase();
-    document.getElementById("welcomeText").innerText = `Welcome ${namePart}!`;
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+        localVideo.srcObject = stream;
 
-    // Set dropdown options
-    const contacts = allowedEmails.filter(e => e !== email);
-    const dropdown = document.getElementById("savedContacts");
-    contacts.forEach(e => {
-      const opt = document.createElement("option");
-      opt.value = e;
-      opt.textContent = e;
-      dropdown.appendChild(opt);
-    });
+        peer.on('call', call => {
+          document.getElementById("incomingModal").style.display = "block";
+          document.getElementById("callerEmail").textContent = call.peer;
+          document.getElementById("acceptCall").onclick = () => {
+            call.answer(stream);
+            document.getElementById("incomingModal").style.display = "none";
+            handleStream(call);
+          };
+          document.getElementById("declineCall").onclick = () => {
+            call.close();
+            document.getElementById("incomingModal").style.display = "none";
+            logCall(`Declined call from ${call.peer}`);
+          };
+        });
 
-    const peer = new Peer(email, {
-      debug: 2
-    });
+        function handleStream(call) {
+          currentCall = call;
+          call.on('stream', remoteStream => {
+            remoteVideo.srcObject = remoteStream;
+          });
+          call.on('close', () => {
+            remoteVideo.srcObject = null;
+            logCall(`Call with ${call.peer} ended`);
+          });
+          logCall(`Call started with ${call.peer}`);
+        }
 
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
-    let currentCall = null;
-
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-      localVideo.srcObject = stream;
-
-      peer.on('call', call => {
-        document.getElementById("incomingModal").style.display = "block";
-        document.getElementById("callerEmail").textContent = call.peer;
-        document.getElementById("acceptCall").onclick = () => {
-          call.answer(stream);
-          document.getElementById("incomingModal").style.display = "none";
+        window.makeCall = () => {
+          const targetId = document.getElementById("targetId").value.trim();
+          if (!allowedEmails.includes(targetId)) {
+            showModal("Invalid Contact", "That user is not registered.");
+            return;
+          }
+          const call = peer.call(targetId, stream);
           handleStream(call);
+          document.getElementById("ringtone").play();
         };
-        document.getElementById("declineCall").onclick = () => {
-          call.close();
-          document.getElementById("incomingModal").style.display = "none";
-          logCall(`Declined call from ${call.peer}`);
+
+        window.endCall = () => {
+          if (currentCall) {
+            currentCall.close();
+            currentCall = null;
+            remoteVideo.srcObject = null;
+          }
         };
       });
 
-      function handleStream(call) {
-        currentCall = call;
-        call.on('stream', remoteStream => {
-          remoteVideo.srcObject = remoteStream;
-        });
-        call.on('close', () => {
-          remoteVideo.srcObject = null;
-          logCall(`Call with ${call.peer} ended`);
-        });
-        logCall(`Call started with ${call.peer}`);
+      function logCall(msg) {
+        const entry = document.createElement("div");
+        entry.className = "call-log";
+        entry.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
+        document.getElementById("callLogs").prepend(entry);
       }
-
-      window.makeCall = () => {
-        const targetId = document.getElementById("targetId").value.trim();
-        if (!allowedEmails.includes(targetId)) {
-          showModal("Invalid Contact", "That user is not registered.");
-          return;
-        }
-        const call = peer.call(targetId, stream);
-        handleStream(call);
-        document.getElementById("ringtone").play();
-      };
-
-      window.endCall = () => {
-        if (currentCall) {
-          currentCall.close();
-          currentCall = null;
-          remoteVideo.srcObject = null;
-        }
-      };
-    });
-
-    function logCall(msg) {
-      const entry = document.createElement("div");
-      entry.className = "call-log";
-      entry.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
-      document.getElementById("callLogs").prepend(entry);
     }
-  }
 
-  function showModal(title, message) {
-    document.getElementById("modalTitle").textContent = title;
-    document.getElementById("modalMessage").textContent = message;
-    document.getElementById("popupModal").style.display = "block";
-  }
-
-  function closeModal() {
-    document.getElementById("popupModal").style.display = "none";
-  }
-
-  window.onload = () => {
-    const stored = localStorage.getItem("novanetUser");
-    if (stored) {
-      document.getElementById("email").value = stored;
-      login();
+    function showModal(title, message) {
+      document.getElementById("modalTitle").textContent = title;
+      document.getElementById("modalMessage").textContent = message;
+      document.getElementById("popupModal").style.display = "block";
     }
-  };
-</script> 
 
+    function closeModal() {
+      document.getElementById("popupModal").style.display = "none";
+    }
+
+    window.onload = () => {
+      const stored = localStorage.getItem("novanetUser");
+      if (stored) {
+        document.getElementById("email").value = stored;
+        login();
+      }
+    };
+  </script>
 </body>
 </html>
