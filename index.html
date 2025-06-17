@@ -19,7 +19,7 @@
   <!-- Call Section -->
   <div class="w-full max-w-5xl bg-white p-6 rounded-2xl shadow-md mt-6 hidden" id="callSection">
     <h3 class="text-xl mb-4 font-semibold">Welcome: <span id="myIdDisplay" class="text-green-700"></span></h3>
-    
+
     <div class="flex flex-col lg:flex-row gap-4">
       <div class="flex-1">
         <select id="savedContacts" class="w-full p-3 border border-gray-300 rounded-lg mb-2">
@@ -30,18 +30,10 @@
         <button onclick="endCall()" class="w-full bg-red-600 text-white font-semibold py-2 rounded-lg">End Call</button>
       </div>
 
-      <div class="flex-1 flex flex-col lg:flex-row gap-4 justify-between">
-        <!-- Local Video -->
-        <div class="relative rounded-2xl overflow-hidden bg-black w-full">
-          <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded-md z-10">You</div>
-          <video id="localVideo" autoplay muted playsinline class="w-full h-auto rounded-2xl"></video>
-        </div>
-
-        <!-- Remote Video -->
-        <div class="relative rounded-2xl overflow-hidden bg-black w-full">
-          <div id="remoteUserLabel" class="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded-md z-10"></div>
-          <video id="remoteVideo" autoplay playsinline class="w-full h-auto rounded-2xl"></video>
-        </div>
+      <!-- Video Container -->
+      <div class="flex-1 relative bg-black rounded-xl overflow-hidden" id="videoContainer">
+        <video id="remoteVideo" autoplay playsinline class="w-full h-auto cursor-pointer"></video>
+        <video id="localVideo" autoplay muted playsinline class="w-32 h-32 absolute bottom-4 right-4 border-4 border-white rounded-lg cursor-pointer"></video>
       </div>
     </div>
 
@@ -56,7 +48,7 @@
   </div>
 
   <!-- Popup Modal -->
-  <div id="popupModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div id="popupModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
     <div class="bg-white rounded-xl shadow-xl p-6 w-80 text-center">
       <h3 id="modalTitle" class="text-lg font-semibold mb-2">Title</h3>
       <p id="modalMessage" class="text-gray-700 mb-4">Message</p>
@@ -65,7 +57,7 @@
   </div>
 
   <!-- Incoming Call Modal -->
-  <div id="incomingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div id="incomingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
     <div class="bg-white rounded-xl shadow-xl p-6 w-80 text-center">
       <h3 class="text-lg font-semibold mb-2">Incoming Call</h3>
       <p id="callerEmail" class="text-gray-800 mb-4"></p>
@@ -79,94 +71,40 @@
   <script>
     const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
     let localStream, currentCall, peer;
-
-    const loginSection = document.getElementById("loginSection");
-    const callSection = document.getElementById("callSection");
-    const myIdDisplay = document.getElementById("myIdDisplay");
-    const popupModal = document.getElementById("popupModal");
-    const modalTitle = document.getElementById("modalTitle");
-    const modalMessage = document.getElementById("modalMessage");
-    const incomingModal = document.getElementById("incomingModal");
-    const callerEmail = document.getElementById("callerEmail");
-    const callLogsDiv = document.getElementById("callLogs");
-    const savedContacts = document.getElementById("savedContacts");
-
     let myEmail = "";
 
     function showModal(title, message) {
-      modalTitle.innerText = title;
-      modalMessage.innerText = message;
-      popupModal.style.display = "block";
+      document.getElementById("modalTitle").innerText = title;
+      document.getElementById("modalMessage").innerText = message;
+      document.getElementById("popupModal").classList.remove("hidden");
     }
 
     function closeModal() {
-      popupModal.style.display = "none";
+      document.getElementById("popupModal").classList.add("hidden");
     }
-
-    function addToLog(type, peerEmail) {
-      const logs = JSON.parse(localStorage.getItem("callLogs_" + myEmail)) || [];
-      logs.unshift(`${new Date().toLocaleString()} - ${type} with ${peerEmail}`);
-      localStorage.setItem("callLogs_" + myEmail, JSON.stringify(logs));
-      renderLogs();
-    }
-
-    function renderLogs() {
-      const logs = JSON.parse(localStorage.getItem("callLogs_" + myEmail)) || [];
-      callLogsDiv.innerHTML = logs.map(l => `<div class='log-entry'>${l}</div>`).join("");
-    }
-
-    function saveCurrentContact() {
-      const contact = document.getElementById("targetId").value.trim().toLowerCase();
-      if (contact && allowedEmails.includes(contact)) {
-        let saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
-        if (!saved.includes(contact)) {
-          saved.push(contact);
-          localStorage.setItem("contacts_" + myEmail, JSON.stringify(saved));
-          renderContacts();
-        }
-      }
-    }
-
-    function renderContacts() {
-      let saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
-      savedContacts.innerHTML = '<option value="">Select saved contact</option>' + saved.map(c => `<option value="${c}">${c}</option>`).join("");
-    }
-
-    savedContacts.addEventListener("change", () => {
-      document.getElementById("targetId").value = savedContacts.value;
-    });
 
     function login() {
       const email = document.getElementById("email").value.trim().toLowerCase();
-      if (!allowedEmails.includes(email)) {
-        showModal("Access Denied", "Only pre-approved emails are allowed.");
-        return;
-      }
+      if (!allowedEmails.includes(email)) return showModal("Access Denied", "Only allowed users can login.");
       myEmail = email;
       localStorage.setItem("novaUser", email);
       initPeer(email.replace(/[^a-z0-9]/gi, ''));
     }
 
-    function initPeer(cleanId) {
-      peer = new Peer(cleanId);
-
-      peer.on("open", id => {
-        myIdDisplay.innerText = localStorage.getItem("novaUser");
-        loginSection.style.display = "none";
-        callSection.style.display = "block";
+    function initPeer(id) {
+      peer = new Peer(id);
+      peer.on("open", () => {
+        document.getElementById("myIdDisplay").innerText = myEmail;
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("callSection").classList.remove("hidden");
         initMedia();
-        renderLogs();
         renderContacts();
       });
 
       peer.on("call", call => {
         currentCall = call;
-        callerEmail.innerText = `Call from ${call.peer}`;
-        incomingModal.style.display = "block";
-      });
-
-      peer.on("error", err => {
-        showModal("Peer Error", err.message);
+        document.getElementById("callerEmail").innerText = `Call from ${call.peer}`;
+        document.getElementById("incomingModal").classList.remove("hidden");
       });
     }
 
@@ -174,58 +112,80 @@
       navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
           localStream = stream;
-          document.getElementById("localVideo").srcObject = stream;
+          const lv = document.getElementById("localVideo");
+          lv.srcObject = stream;
+
+          // Switch view on click
+          lv.addEventListener("click", () => switchVideos(true));
+          document.getElementById("remoteVideo").addEventListener("click", () => switchVideos(false));
         })
-        .catch(() => {
-          showModal("Permission Denied", "Could not access camera/mic.");
-        });
+        .catch(() => showModal("Media Error", "Unable to access camera/microphone"));
+    }
+
+    function switchVideos(myFirst) {
+      const local = document.getElementById("localVideo");
+      const remote = document.getElementById("remoteVideo");
+      if (myFirst) {
+        local.classList.remove("w-32", "h-32", "absolute", "bottom-4", "right-4");
+        local.classList.add("w-full", "h-auto");
+        remote.classList.add("w-32", "h-32", "absolute", "bottom-4", "right-4");
+        remote.classList.remove("w-full", "h-auto");
+      } else {
+        remote.classList.remove("w-32", "h-32", "absolute", "bottom-4", "right-4");
+        remote.classList.add("w-full", "h-auto");
+        local.classList.add("w-32", "h-32", "absolute", "bottom-4", "right-4");
+        local.classList.remove("w-full", "h-auto");
+      }
     }
 
     function makeCall() {
       const target = document.getElementById("targetId").value.trim().toLowerCase();
-      if (!allowedEmails.includes(target)) {
-        showModal("Invalid Target", "That user is not in the allowed list.");
-        return;
-      }
-      const cleanTarget = target.replace(/[^a-z0-9]/gi, '');
-      const call = peer.call(cleanTarget, localStream);
+      if (!allowedEmails.includes(target)) return showModal("Invalid", "Email not allowed.");
+      const cleanId = target.replace(/[^a-z0-9]/gi, '');
+      const call = peer.call(cleanId, localStream);
       currentCall = call;
-      addToLog("Outgoing Call", target);
       call.on("stream", stream => {
-        document.getElementById("remoteVideo").srcObject = stream;
-      });
-      call.on("close", () => {
-        showModal("Call Ended", `Call with ${target} has ended.`);
-        addToLog("Call Ended", target);
+        const rv = document.getElementById("remoteVideo");
+        rv.srcObject = stream;
+        switchVideos(false);
       });
     }
 
     function acceptCall() {
-      incomingModal.style.display = "none";
+      document.getElementById("incomingModal").classList.add("hidden");
       currentCall.answer(localStream);
       currentCall.on("stream", stream => {
-        document.getElementById("remoteVideo").srcObject = stream;
+        const rv = document.getElementById("remoteVideo");
+        rv.srcObject = stream;
+        switchVideos(false);
       });
-      addToLog("Incoming Call (Accepted)", currentCall.peer);
-    }
-
-    function declineCall() {
-      incomingModal.style.display = "none";
-      showModal("Call Declined", `You declined the call from ${currentCall.peer}`);
-      peer.connect(currentCall.peer).on("open", function(conn) {
-        conn.send("CALL_DECLINED");
-      });
-      currentCall.close();
-      addToLog("Incoming Call (Declined)", currentCall.peer);
     }
 
     function endCall() {
-      if (currentCall) {
-        currentCall.close();
-        showModal("Call Ended", "You ended the call.");
-        addToLog("Call Ended", currentCall.peer);
+      if (currentCall) currentCall.close();
+      showModal("Call Ended", "You ended the call.");
+    }
+
+    function saveCurrentContact() {
+      const contact = document.getElementById("targetId").value.trim().toLowerCase();
+      if (!allowedEmails.includes(contact)) return;
+      let saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
+      if (!saved.includes(contact)) {
+        saved.push(contact);
+        localStorage.setItem("contacts_" + myEmail, JSON.stringify(saved));
+        renderContacts();
       }
     }
+
+    function renderContacts() {
+      const saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
+      const savedContacts = document.getElementById("savedContacts");
+      savedContacts.innerHTML = '<option value="">Select saved contact</option>' + saved.map(c => `<option value="${c}">${c}</option>`).join("");
+    }
+
+    document.getElementById("savedContacts").addEventListener("change", function() {
+      document.getElementById("targetId").value = this.value;
+    });
 
     window.onload = () => {
       const user = localStorage.getItem("novaUser");
@@ -234,7 +194,7 @@
         myEmail = user;
         initPeer(user.replace(/[^a-z0-9]/gi, ''));
       }
-    };
+    }
   </script>
 </body>
 </html>
