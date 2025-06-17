@@ -3,49 +3,49 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NovaFX Call</title>
+  <title>NovaNET Call</title>
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f3f4f6;
       margin: 0;
-      padding: 0;
+      font-family: sans-serif;
+      background: #f9fafb;
     }
 
     .topbar {
       position: fixed;
       top: 0;
+      left: 0;
       width: 100%;
       background: #16a34a;
       color: white;
-      padding: 0.6rem 1rem;
+      padding: 10px 20px;
       font-weight: bold;
-      text-align: center;
+      text-align: left;
       z-index: 999;
     }
 
-    .welcome-bar {
-      margin-top: 2.8rem;
-      text-align: center;
+    .welcome {
+      margin-top: 50px;
+      padding: 8px 20px;
       font-size: 16px;
-      font-weight: 500;
       color: #16a34a;
+      font-weight: 500;
     }
 
     .container {
       max-width: 600px;
-      background: #fff;
-      padding: 1.2rem;
+      margin: 10px auto;
+      background: white;
+      padding: 20px;
       border-radius: 12px;
-      margin: 1rem auto;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 
     input, select {
       width: 100%;
       padding: 10px;
-      margin: 10px 0;
+      margin-top: 10px;
       border-radius: 8px;
       border: 1px solid #ccc;
     }
@@ -54,22 +54,20 @@
       background: #16a34a;
       color: white;
       font-weight: bold;
-      padding: 6px 12px;
-      margin: 8px 4px 0 0;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
+      padding: 10px 14px;
       cursor: pointer;
-      font-size: 14px;
+      margin-top: 10px;
     }
 
-    .video-wrapper {
+    .video-box {
+      margin-top: 20px;
       position: relative;
-      width: 100%;
-      height: 260px;
-      background: #000;
+      background: black;
+      height: 240px;
       border-radius: 10px;
       overflow: hidden;
-      margin-top: 10px;
     }
 
     #remoteVideo {
@@ -86,15 +84,22 @@
       height: 90px;
       border: 2px solid #fff;
       border-radius: 8px;
-      background: #000;
       object-fit: cover;
     }
 
-    .btn-group {
+    .row {
       display: flex;
-      flex-wrap: wrap;
       gap: 10px;
       margin-top: 10px;
+    }
+
+    .row input {
+      flex: 2;
+    }
+
+    .row button {
+      flex: 1;
+      margin-top: 0;
     }
 
     .modal {
@@ -103,40 +108,23 @@
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       background: white;
-      padding: 1.5rem;
+      padding: 20px;
       border-radius: 12px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.3);
-      z-index: 999;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      z-index: 1000;
       text-align: center;
     }
 
     .call-log {
-      background: #f9fafb;
-      padding: 10px 14px;
-      border-radius: 8px;
-      margin: 6px 0;
+      padding: 10px;
+      background: #f3f4f6;
       border-left: 4px solid #16a34a;
+      margin: 8px 0;
+      border-radius: 8px;
     }
 
-    .row-flex {
-      display: flex;
-      gap: 10px;
-    }
-
-    .row-flex > input {
-      flex: 2;
-    }
-
-    .row-flex > button {
-      flex: 1;
-    }
-
-    @media (max-width: 640px) {
-      #localVideo {
-        width: 90px;
-        height: 70px;
-      }
-      .row-flex {
+    @media (max-width: 600px) {
+      .row {
         flex-direction: column;
       }
     }
@@ -144,43 +132,41 @@
 </head>
 <body>
 
-  <div class="topbar">NovaNET Video Call</div>
-  <div class="welcome-bar" id="welcomeText">Welcome!</div>
+  <div class="topbar">NovaNET</div>
+  <div class="welcome" id="welcomeText">Welcome!</div>
 
   <div class="container" id="loginSection">
-    <input type="email" id="email" placeholder="Enter your email to register/login">
+    <input type="email" id="email" placeholder="Enter your email">
     <button onclick="login()">Login</button>
   </div>
 
   <div class="container" id="callSection" style="display:none;">
-    <h3>You are: <span id="myIdDisplay"></span></h3>
+    <div><strong>You are:</strong> <span id="myIdDisplay"></span></div>
 
     <select id="savedContacts" onchange="document.getElementById('targetId').value=this.value;">
-      <option value="">Select saved contact</option>
+      <option value="">Select Contact</option>
     </select>
 
-    <div class="row-flex">
+    <div class="row">
       <input type="text" id="targetId" placeholder="Enter recipient email">
-      <button onclick="makeCall()">📞 Call</button>
+      <button onclick="makeCall()">Call</button>
     </div>
 
-    <button onclick="endCall()">❌ End Call</button>
+    <button onclick="endCall()">End Call</button>
 
-    <div class="video-wrapper">
+    <div class="video-box">
       <video id="remoteVideo" autoplay playsinline></video>
       <video id="localVideo" autoplay muted playsinline></video>
     </div>
 
-    <div>
-      <h4>Call Logs</h4>
-      <div id="callLogs"></div>
-    </div>
+    <h4>Call Logs</h4>
+    <div id="callLogs"></div>
   </div>
 
-  <!-- Feedback Modal -->
+  <!-- Popup Modal -->
   <div class="modal" id="popupModal">
-    <h3 id="modalTitle">Title</h3>
-    <p id="modalMessage">Message</p>
+    <h3 id="modalTitle"></h3>
+    <p id="modalMessage"></p>
     <button onclick="closeModal()">OK</button>
   </div>
 
@@ -188,10 +174,8 @@
   <div class="modal" id="incomingModal">
     <h3>Incoming Call</h3>
     <p id="callerEmail"></p>
-    <div class="btn-group">
-      <button id="acceptCall">Accept</button>
-      <button id="declineCall">Decline</button>
-    </div>
+    <button id="acceptCall">Accept</button>
+    <button id="declineCall">Decline</button>
   </div>
 
   <!-- Ringtone -->
@@ -219,6 +203,7 @@
 
       const contacts = allowedEmails.filter(e => e !== email);
       const dropdown = document.getElementById("savedContacts");
+      dropdown.innerHTML = '<option value="">Select Contact</option>';
       contacts.forEach(e => {
         const opt = document.createElement("option");
         opt.value = e;
