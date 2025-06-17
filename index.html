@@ -68,24 +68,31 @@
     </div>
   </div>
 
-  <script>
+   <script>
     const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
-    let localStream, currentCall, peer, isLocalPrimary = true;
+    let localStream, currentCall, peer;
+
+    const loginSection = document.getElementById("loginSection");
+    const callSection = document.getElementById("callSection");
+    const myIdDisplay = document.getElementById("myIdDisplay");
+    const popupModal = document.getElementById("popupModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalMessage = document.getElementById("modalMessage");
+    const incomingModal = document.getElementById("incomingModal");
+    const callerEmail = document.getElementById("callerEmail");
+    const callLogsDiv = document.getElementById("callLogs");
+    const savedContacts = document.getElementById("savedContacts");
+
     let myEmail = "";
 
-    const mainVideo = document.getElementById("mainVideo");
-    const miniVideo = document.getElementById("miniVideo");
-    const mainLabel = document.getElementById("mainLabel");
-    const callLogsDiv = document.getElementById("callLogs");
-
     function showModal(title, message) {
-      document.getElementById("modalTitle").innerText = title;
-      document.getElementById("modalMessage").innerText = message;
-      document.getElementById("popupModal").style.display = "flex";
+      modalTitle.innerText = title;
+      modalMessage.innerText = message;
+      popupModal.style.display = "block";
     }
 
     function closeModal() {
-      document.getElementById("popupModal").style.display = "none";
+      popupModal.style.display = "none";
     }
 
     function addToLog(type, peerEmail) {
@@ -113,37 +120,45 @@
     }
 
     function renderContacts() {
-      const saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
-      const select = document.getElementById("savedContacts");
-      select.innerHTML = '<option value="">Select saved contact</option>' + saved.map(c => `<option value="${c}">${c}</option>`).join("");
+      let saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
+      savedContacts.innerHTML = '<option value="">Select saved contact</option>' + saved.map(c => `<option value="${c}">${c}</option>`).join("");
     }
 
-    document.getElementById("savedContacts").addEventListener("change", () => {
-      document.getElementById("targetId").value = document.getElementById("savedContacts").value;
+    savedContacts.addEventListener("change", () => {
+      document.getElementById("targetId").value = savedContacts.value;
     });
 
     function login() {
       const email = document.getElementById("email").value.trim().toLowerCase();
-      if (!allowedEmails.includes(email)) return showModal("Access Denied", "Only approved emails allowed.");
+      if (!allowedEmails.includes(email)) {
+        showModal("Access Denied", "Only pre-approved emails are allowed.");
+        return;
+      }
       myEmail = email;
       localStorage.setItem("novaUser", email);
       initPeer(email.replace(/[^a-z0-9]/gi, ''));
     }
 
-    function initPeer(id) {
-      peer = new Peer(id);
-      peer.on("open", () => {
-        document.getElementById("myIdDisplay").innerText = myEmail;
-        document.getElementById("loginSection").style.display = "none";
-        document.getElementById("callSection").style.display = "block";
+    function initPeer(cleanId) {
+      peer = new Peer(cleanId);
+
+      peer.on("open", id => {
+        myIdDisplay.innerText = localStorage.getItem("novaUser");
+        loginSection.style.display = "none";
+        callSection.style.display = "block";
         initMedia();
         renderLogs();
         renderContacts();
       });
+
       peer.on("call", call => {
         currentCall = call;
-        document.getElementById("callerEmail").innerText = `Call from ${call.peer}`;
-        document.getElementById("incomingModal").style.display = "flex";
+        callerEmail.innerText = `Call from ${call.peer}`;
+        incomingModal.style.display = "block";
+      });
+
+      peer.on("error", err => {
+        showModal("Peer Error", err.message);
       });
     }
 
@@ -151,54 +166,47 @@
       navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
           localStream = stream;
-          mainVideo.srcObject = stream;
-          mainVideo.muted = true;
-          isLocalPrimary = true;
-          mainLabel.innerText = "You";
+          document.getElementById("localVideo").srcObject = stream;
         })
-        .catch(() => showModal("Camera Error", "Permission denied or device unavailable."));
+        .catch(() => {
+          showModal("Permission Denied", "Could not access camera/mic.");
+        });
     }
 
     function makeCall() {
       const target = document.getElementById("targetId").value.trim().toLowerCase();
-      if (!allowedEmails.includes(target)) return showModal("Invalid Target", "User not allowed.");
-      const call = peer.call(target.replace(/[^a-z0-9]/gi, ''), localStream);
+      if (!allowedEmails.includes(target)) {
+        showModal("Invalid Target", "That user is not in the allowed list.");
+        return;
+      }
+      const cleanTarget = target.replace(/[^a-z0-9]/gi, '');
+      const call = peer.call(cleanTarget, localStream);
       currentCall = call;
       addToLog("Outgoing Call", target);
-
       call.on("stream", stream => {
-        mainVideo.srcObject = stream;
-        miniVideo.srcObject = localStream;
-        mainVideo.muted = false;
-        miniVideo.muted = true;
-        mainLabel.innerText = target;
-        isLocalPrimary = false;
+        document.getElementById("remoteVideo").srcObject = stream;
       });
-
       call.on("close", () => {
-        showModal("Call Ended", `Call with ${target} ended.`);
+        showModal("Call Ended", `Call with ${target} has ended.`);
         addToLog("Call Ended", target);
       });
     }
 
     function acceptCall() {
-      document.getElementById("incomingModal").style.display = "none";
+      incomingModal.style.display = "none";
       currentCall.answer(localStream);
-      addToLog("Incoming Call (Accepted)", currentCall.peer);
-
       currentCall.on("stream", stream => {
-        mainVideo.srcObject = stream;
-        miniVideo.srcObject = localStream;
-        mainVideo.muted = false;
-        miniVideo.muted = true;
-        mainLabel.innerText = currentCall.peer;
-        isLocalPrimary = false;
+        document.getElementById("remoteVideo").srcObject = stream;
       });
+      addToLog("Incoming Call (Accepted)", currentCall.peer);
     }
 
     function declineCall() {
-      document.getElementById("incomingModal").style.display = "none";
+      incomingModal.style.display = "none";
       showModal("Call Declined", `You declined the call from ${currentCall.peer}`);
+      peer.connect(currentCall.peer).on("open", function(conn) {
+        conn.send("CALL_DECLINED");
+      });
       currentCall.close();
       addToLog("Incoming Call (Declined)", currentCall.peer);
     }
@@ -206,24 +214,10 @@
     function endCall() {
       if (currentCall) {
         currentCall.close();
-        addToLog("Call Ended", currentCall.peer);
         showModal("Call Ended", "You ended the call.");
+        addToLog("Call Ended", currentCall.peer);
       }
     }
-
-    mainVideo.addEventListener("click", () => {
-      if (!miniVideo.srcObject) return;
-      [mainVideo.srcObject, miniVideo.srcObject] = [miniVideo.srcObject, mainVideo.srcObject];
-      isLocalPrimary = !isLocalPrimary;
-      mainLabel.innerText = isLocalPrimary ? "You" : currentCall?.peer || "User";
-    });
-
-    miniVideo.addEventListener("click", () => {
-      if (!miniVideo.srcObject) return;
-      [mainVideo.srcObject, miniVideo.srcObject] = [miniVideo.srcObject, mainVideo.srcObject];
-      isLocalPrimary = !isLocalPrimary;
-      mainLabel.innerText = isLocalPrimary ? "You" : currentCall?.peer || "User";
-    });
 
     window.onload = () => {
       const user = localStorage.getItem("novaUser");
