@@ -9,62 +9,30 @@
     body {
       font-family: 'Segoe UI', sans-serif;
       background: #f3f4f6;
-      margin: 0;
-      padding-top: 80px; /* Space for fixed header */
-    }
-    .header-fixed {
-      position: fixed;
-      top: 0;
-      width: 100%;
-      z-index: 1000;
-      background: #1e5e4b;
-      color: white;
-    }
-    .header-top {
-      display: flex;
-      justify-content: space-between;
+      margin: 0; padding: 0;
+      display: flex; flex-direction: column;
       align-items: center;
-      padding: 10px 16px;
-      font-weight: bold;
     }
-    .welcome-bar {
-      display: flex;
-      align-items: center;
-      padding: 8px 16px;
-      background: #256d5a;
-      gap: 8px;
-    }
-    .welcome-avatar {
-      background: #9333ea;
-      border-radius: 50%;
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 14px;
-      font-weight: bold;
-    }
-
     .container {
       max-width: 600px;
       background: #fff;
       padding: 1.2rem;
       border-radius: 12px;
-      margin: 1rem auto;
+      margin-top: 2rem;
       box-shadow: 0 4px 15px rgba(0,0,0,0.1);
       width: 90%;
     }
-
+    h2, h3, h4 {
+      color: #16a34a;
+      margin: 0.5rem 0;
+    }
     input, select {
       width: 100%;
-      padding: 8px;
-      margin-top: 8px;
-      border-radius: 6px;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
       border: 1px solid #ccc;
     }
-
     button {
       background: #16a34a;
       color: white;
@@ -77,6 +45,7 @@
       font-size: 14px;
     }
 
+    /* Video Layout */
     .video-wrapper {
       position: relative;
       width: 100%;
@@ -114,8 +83,7 @@
     .modal {
       display: none;
       position: fixed;
-      top: 50%;
-      left: 50%;
+      top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       background: white;
       padding: 1.5rem;
@@ -137,12 +105,6 @@
       display: none;
     }
 
-    .input-row {
-      display: flex;
-      gap: 6px;
-      margin-top: 10px;
-    }
-
     @media (max-width: 640px) {
       .video-wrapper {
         height: 200px;
@@ -151,42 +113,22 @@
         width: 90px;
         height: 70px;
       }
-      .input-row {
-        flex-direction: column;
-      }
     }
   </style>
 </head>
 <body>
 
-<!-- Fixed Header -->
-<div class="header-fixed">
-  <div class="header-top">
-    <span>NovaNET</span>
-  </div>
-  <div class="welcome-bar">
-    <div id="userInitial" class="welcome-avatar">J</div>
-    <span id="welcomeText">Welcome!</span>
-  </div>
-</div>
-
-<!-- Login Section -->
 <div class="container" id="loginSection">
   <h2>NovaFX Connect</h2>
   <input type="email" id="email" placeholder="Enter your email to register/login">
   <button onclick="login()">Login</button>
 </div>
 
-<!-- Call Section -->
 <div class="container" id="callSection" style="display:none;">
   <h3>Welcome: <span id="myIdDisplay"></span></h3>
 
-  <div class="input-row">
-    <select id="savedContacts">
-      <option value="">Select contact</option>
-    </select>
-    <input type="text" id="targetId" placeholder="Recipient's email">
-  </div>
+  <select id="savedContacts"><option value="">Select saved contact</option></select>
+  <input type="text" id="targetId" placeholder="Enter recipient's email to call">
 
   <div class="btn-group">
     <button onclick="makeCall()">📞 Call</button>
@@ -221,122 +163,182 @@
   </div>
 </div>
 
+<!-- Ringtone -->
 <audio id="ringtone" src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg" preload="auto"></audio>
 
 <script>
-  const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
-  let currentUser = "";
+const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
+let localStream, currentCall, peer, myEmail = "";
+let connections = [];
+let ringtone;
 
-  function login() {
-    const email = document.getElementById("email").value.trim().toLowerCase();
-    if (!allowedEmails.includes(email)) {
-      showModal("Access Denied", "Only registered NovaNET users can login.");
-      return;
-    }
+function showModal(title, message) {
+  document.getElementById("modalTitle").innerText = title;
+  document.getElementById("modalMessage").innerText = message;
+  document.getElementById("popupModal").style.display = "block";
+}
 
-    localStorage.setItem("novanetUser", email);
-    currentUser = email;
+function closeModal() {
+  document.getElementById("popupModal").style.display = "none";
+}
+
+function login() {
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  if (!allowedEmails.includes(email)) {
+    showModal("Access Denied", "Only pre-approved emails are allowed.");
+    return;
+  }
+  myEmail = email;
+  localStorage.setItem("novaUser", email);
+  initPeer(email.replace(/[^a-z0-9]/gi, ''));
+}
+
+function initPeer(cleanId) {
+  peer = new Peer(cleanId);
+  peer.on("open", () => {
+    document.getElementById("myIdDisplay").innerText = myEmail;
     document.getElementById("loginSection").style.display = "none";
     document.getElementById("callSection").style.display = "block";
+    initMedia();
+    renderContacts();
+  });
 
-    const namePart = email.split('@')[0];
-    document.getElementById("myIdDisplay").innerText = email;
-    document.getElementById("userInitial").innerText = namePart.charAt(0).toUpperCase();
-    document.getElementById("welcomeText").innerText = `Welcome ${namePart}!`;
+  peer.on("call", call => {
+    currentCall = call;
+    showIncoming(call.peer);
+    ringtone.play();
 
-    // Set dropdown options
-    const contacts = allowedEmails.filter(e => e !== email);
-    const dropdown = document.getElementById("savedContacts");
-    contacts.forEach(e => {
-      const opt = document.createElement("option");
-      opt.value = e;
-      opt.textContent = e;
-      dropdown.appendChild(opt);
-    });
-
-    const peer = new Peer(email, {
-      debug: 2
-    });
-
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
-    let currentCall = null;
-
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-      localVideo.srcObject = stream;
-
-      peer.on('call', call => {
-        document.getElementById("incomingModal").style.display = "block";
-        document.getElementById("callerEmail").textContent = call.peer;
-        document.getElementById("acceptCall").onclick = () => {
-          call.answer(stream);
-          document.getElementById("incomingModal").style.display = "none";
-          handleStream(call);
-        };
-        document.getElementById("declineCall").onclick = () => {
-          call.close();
-          document.getElementById("incomingModal").style.display = "none";
-          logCall(`Declined call from ${call.peer}`);
-        };
-      });
-
-      function handleStream(call) {
-        currentCall = call;
-        call.on('stream', remoteStream => {
-          remoteVideo.srcObject = remoteStream;
-        });
-        call.on('close', () => {
-          remoteVideo.srcObject = null;
-          logCall(`Call with ${call.peer} ended`);
-        });
-        logCall(`Call started with ${call.peer}`);
+    const autoDeclineTimer = setTimeout(() => {
+      if (document.getElementById("incomingModal").style.display === "block") {
+        ringtone.pause();
+        ringtone.currentTime = 0;
+        hideIncoming();
+        showModal("Missed Call", `You missed a call from ${call.peer}`);
+        call.close();
+        logCall(call.peer, "Missed");
       }
+    }, 20000);
 
-      window.makeCall = () => {
-        const targetId = document.getElementById("targetId").value.trim();
-        if (!allowedEmails.includes(targetId)) {
-          showModal("Invalid Contact", "That user is not registered.");
-          return;
-        }
-        const call = peer.call(targetId, stream);
-        handleStream(call);
-        document.getElementById("ringtone").play();
-      };
+    document.getElementById("acceptCall").onclick = () => {
+      clearTimeout(autoDeclineTimer);
+      ringtone.pause();
+      ringtone.currentTime = 0;
+      call.answer(localStream);
+      call.on('stream', remoteStream => {
+        document.getElementById("remoteVideo").srcObject = remoteStream;
+      });
+      hideIncoming();
+      logCall(call.peer, "Incoming");
+    };
 
-      window.endCall = () => {
-        if (currentCall) {
-          currentCall.close();
-          currentCall = null;
-          remoteVideo.srcObject = null;
-        }
-      };
+    document.getElementById("declineCall").onclick = () => {
+      clearTimeout(autoDeclineTimer);
+      ringtone.pause();
+      ringtone.currentTime = 0;
+      hideIncoming();
+      call.close();
+      showModal("Missed Call", `You missed a call from ${call.peer}`);
+      logCall(call.peer, "Missed");
+    };
+  });
+
+  peer.on("connection", conn => {
+    conn.on("data", data => {
+      if (data === "CALL_DECLINED") {
+        showModal("Call Declined", `${conn.peer} declined your call.`);
+      }
     });
+  });
 
-    function logCall(msg) {
-      const entry = document.createElement("div");
-      entry.className = "call-log";
-      entry.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
-      document.getElementById("callLogs").prepend(entry);
-    }
+  peer.on("error", err => {
+    showModal("Peer Error", err.message);
+  });
+}
+
+function initMedia() {
+  navigator.mediaDevices.getUserMedia({ video: { width: 1280 }, audio: true })
+    .then(stream => {
+      localStream = stream;
+      document.getElementById("localVideo").srcObject = stream;
+    })
+    .catch(() => showModal("Permission Denied", "Could not access camera/mic."));
+}
+
+function makeCall() {
+  const target = document.getElementById("targetId").value.trim().toLowerCase();
+  if (!allowedEmails.includes(target)) {
+    showModal("Invalid Target", "That user is not in the allowed list.");
+    return;
   }
+  const cleanTarget = target.replace(/[^a-z0-9]/gi, '');
+  const call = peer.call(cleanTarget, localStream);
+  currentCall = call;
+  connections.push(call);
+  logCall(target, "Outgoing");
 
-  function showModal(title, message) {
-    document.getElementById("modalTitle").textContent = title;
-    document.getElementById("modalMessage").textContent = message;
-    document.getElementById("popupModal").style.display = "block";
+  call.on("stream", stream => {
+    document.getElementById("remoteVideo").srcObject = stream;
+  });
+
+  call.on("close", () => {
+    showModal("Call Ended", `Call with ${target} ended.`);
+  });
+}
+
+function endCall() {
+  if (currentCall) {
+    currentCall.close();
+    document.getElementById("remoteVideo").srcObject = null;
+    showModal("Call Ended", "You ended the call.");
   }
+  connections.forEach(c => c.close());
+  connections = [];
+}
 
-  function closeModal() {
-    document.getElementById("popupModal").style.display = "none";
+function showIncoming(email) {
+  document.getElementById("incomingModal").style.display = "block";
+  document.getElementById("callerEmail").innerText = email;
+}
+
+function hideIncoming() {
+  document.getElementById("incomingModal").style.display = "none";
+}
+
+function logCall(contact, type) {
+  const time = new Date().toLocaleTimeString();
+  const log = document.createElement("div");
+  log.className = "call-log";
+  log.innerText = `[${type}] ${contact} @ ${time}`;
+  const callLogsDiv = document.getElementById("callLogs");
+  callLogsDiv.prepend(log);
+
+  const allLogs = document.querySelectorAll(".call-log");
+  allLogs.forEach((log, index) => {
+    log.style.display = index < 3 ? "block" : "none";
+  });
+}
+
+function renderContacts() {
+  let saved = JSON.parse(localStorage.getItem("contacts_" + myEmail)) || [];
+  document.getElementById("savedContacts").innerHTML =
+    '<option value="">Select saved contact</option>' +
+    saved.map(c => `<option value="${c}">${c}</option>`).join("");
+}
+
+document.getElementById("savedContacts").addEventListener("change", () => {
+  document.getElementById("targetId").value = document.getElementById("savedContacts").value;
+});
+
+window.onload = () => {
+  ringtone = document.getElementById('ringtone');
+  const user = localStorage.getItem("novaUser");
+  if (user && allowedEmails.includes(user)) {
+    document.getElementById("email").value = user;
+    myEmail = user;
+    initPeer(user.replace(/[^a-z0-9]/gi, ''));
   }
-
-  window.onload = () => {
-    const stored = localStorage.getItem("novanetUser");
-    if (stored) {
-      document.getElementById("email").value = stored;
-      login();
-    }
-  };
+};
 </script>
+
 </body>
 </html>
