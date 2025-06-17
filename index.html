@@ -45,7 +45,6 @@
       font-size: 14px;
     }
 
-    /* Video Layout */
     .video-wrapper {
       position: relative;
       width: 100%;
@@ -118,6 +117,15 @@
 </head>
 <body>
 
+<!-- NovaNET Welcome Bar -->
+<div style="width:100%; background:#1e5e4b; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;">
+  <h3 style="color:white; font-size: 20px;">NovaNET</h3>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <div id="userInitial" style="background:#9333ea; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold;"></div>
+    <span id="welcomeText" style="color:white; font-size:14px;">Welcome!</span>
+  </div>
+</div>
+
 <div class="container" id="loginSection">
   <h2>NovaFX Connect</h2>
   <input type="email" id="email" placeholder="Enter your email to register/login">
@@ -163,6 +171,14 @@
   </div>
 </div>
 
+<!-- New User Name Modal -->
+<div class="modal" id="nameModal">
+  <h3>Welcome to NovaNET</h3>
+  <p>Please enter your name to continue:</p>
+  <input type="text" id="userNameInput" placeholder="Your name" />
+  <button onclick="saveUserName()">Continue</button>
+</div>
+
 <!-- Ringtone -->
 <audio id="ringtone" src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg" preload="auto"></audio>
 
@@ -190,7 +206,26 @@ function login() {
   }
   myEmail = email;
   localStorage.setItem("novaUser", email);
+  if (!localStorage.getItem("novaName")) {
+    document.getElementById("nameModal").style.display = "block";
+  } else {
+    updateWelcomeBar();
+  }
   initPeer(email.replace(/[^a-z0-9]/gi, ''));
+}
+
+function saveUserName() {
+  const name = document.getElementById("userNameInput").value.trim();
+  if (!name) return;
+  localStorage.setItem("novaName", name);
+  document.getElementById("nameModal").style.display = "none";
+  updateWelcomeBar();
+}
+
+function updateWelcomeBar() {
+  const name = localStorage.getItem("novaName") || "User";
+  document.getElementById("welcomeText").textContent = `Welcome ${name}! 👋`;
+  document.getElementById("userInitial").textContent = name.charAt(0).toUpperCase();
 }
 
 function initPeer(cleanId) {
@@ -311,11 +346,6 @@ function logCall(contact, type) {
   log.innerText = `[${type}] ${contact} @ ${time}`;
   const callLogsDiv = document.getElementById("callLogs");
   callLogsDiv.prepend(log);
-
-  const allLogs = document.querySelectorAll(".call-log");
-  allLogs.forEach((log, index) => {
-    log.style.display = index < 3 ? "block" : "none";
-  });
 }
 
 function renderContacts() {
@@ -335,10 +365,14 @@ window.onload = () => {
   if (user && allowedEmails.includes(user)) {
     document.getElementById("email").value = user;
     myEmail = user;
+    if (!localStorage.getItem("novaName")) {
+      document.getElementById("nameModal").style.display = "block";
+    } else {
+      updateWelcomeBar();
+    }
     initPeer(user.replace(/[^a-z0-9]/gi, ''));
   }
 };
 </script>
-
 </body>
 </html>
