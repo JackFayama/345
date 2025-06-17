@@ -16,14 +16,15 @@
     .container {
       max-width: 600px;
       background: #fff;
-      padding: 1.5rem;
+      padding: 1.2rem;
       border-radius: 12px;
       margin-top: 2rem;
       box-shadow: 0 4px 15px rgba(0,0,0,0.1);
       width: 90%;
     }
-    h2 {
+    h2, h3, h4 {
       color: #16a34a;
+      margin: 0.5rem 0;
     }
     input, select {
       width: 100%;
@@ -36,32 +37,49 @@
       background: #16a34a;
       color: white;
       font-weight: bold;
-      padding: 6px 10px;
-      margin: 5px 5px 5px 0;
+      padding: 6px 12px;
+      margin: 8px 4px 0 0;
       border: none;
       border-radius: 6px;
       cursor: pointer;
       font-size: 14px;
     }
-    video {
-      width: 48%;
-      height: auto;
+
+    /* Video Layout */
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      height: 260px;
+      background: #000;
       border-radius: 10px;
-      background: black;
-    }
-    .video-area {
-      display: flex;
-      justify-content: space-between;
-      gap: 4%;
+      overflow: hidden;
       margin-top: 10px;
-      flex-wrap: wrap;
     }
+    #remoteVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #localVideo {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 120px;
+      height: 90px;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      background: #000;
+      object-fit: cover;
+    }
+
     .btn-group {
       display: flex;
-      flex-wrap: wrap;
       justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
       margin-top: 10px;
     }
+
     .modal {
       display: none;
       position: fixed;
@@ -72,15 +90,28 @@
       border-radius: 12px;
       box-shadow: 0 0 20px rgba(0,0,0,0.3);
       z-index: 999;
+      text-align: center;
     }
-    .log-entry { font-size: 14px; margin-bottom: 4px; }
+
+    .call-log {
+      background: #f9fafb;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin: 6px 0;
+      border-left: 4px solid #16a34a;
+    }
+
+    #callLogs > .call-log:nth-child(n+4) {
+      display: none;
+    }
+
     @media (max-width: 640px) {
-      video {
-        width: 100%;
-        margin-bottom: 10px;
+      .video-wrapper {
+        height: 200px;
       }
-      .video-area {
-        flex-direction: column;
+      #localVideo {
+        width: 90px;
+        height: 70px;
       }
     }
   </style>
@@ -98,23 +129,15 @@
 
   <select id="savedContacts"><option value="">Select saved contact</option></select>
   <input type="text" id="targetId" placeholder="Enter recipient's email to call">
-  <button onclick="makeCall()">Call</button>
-
-  <div class="video-area">
-    <video id="localVideo" autoplay muted playsinline></video>
-    <video id="remoteVideo" autoplay playsinline></video>
-  </div>
 
   <div class="btn-group">
-    <button onclick="endCall()">End</button>
-    <button onclick="toggleMute()">Mute</button>
-    <button onclick="shareScreen()">Share</button>
-    <input type="text" id="addUserEmail" placeholder="Add user to call" style="flex: 1; margin: 5px 5px 5px 0;">
-    <button onclick="addUserToCall()">Add</button>
+    <button onclick="makeCall()">📞 Call</button>
+    <button onclick="endCall()">❌ End</button>
   </div>
 
-  <div>
-    <button onclick="saveCurrentContact()">Save This Contact</button>
+  <div class="video-wrapper">
+    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="localVideo" autoplay muted playsinline></video>
   </div>
 
   <div>
