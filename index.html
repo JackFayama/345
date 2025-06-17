@@ -223,9 +223,12 @@
 
 <audio id="ringtone" src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg" preload="auto"></audio>
 
-<script>
+  <script>
   const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
   let currentUser = "";
+  let stream = null;
+  let peer = null;
+  let currentCall = null;
 
   function login() {
     const email = document.getElementById("email").value.trim().toLowerCase();
@@ -244,7 +247,6 @@
     document.getElementById("userInitial").innerText = namePart.charAt(0).toUpperCase();
     document.getElementById("welcomeText").innerText = `Welcome ${namePart}!`;
 
-    // Set dropdown options
     const contacts = allowedEmails.filter(e => e !== email);
     const dropdown = document.getElementById("savedContacts");
     contacts.forEach(e => {
@@ -254,69 +256,65 @@
       dropdown.appendChild(opt);
     });
 
-    const peer = new Peer(email, {
-      debug: 2
-    });
+    peer = new Peer(email);
 
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
-    let currentCall = null;
-
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-      localVideo.srcObject = stream;
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(userStream => {
+      stream = userStream;
+      document.getElementById("localVideo").srcObject = stream;
 
       peer.on('call', call => {
         document.getElementById("incomingModal").style.display = "block";
         document.getElementById("callerEmail").textContent = call.peer;
+
         document.getElementById("acceptCall").onclick = () => {
           call.answer(stream);
           document.getElementById("incomingModal").style.display = "none";
           handleStream(call);
         };
+
         document.getElementById("declineCall").onclick = () => {
           call.close();
           document.getElementById("incomingModal").style.display = "none";
           logCall(`Declined call from ${call.peer}`);
         };
       });
-
-      function handleStream(call) {
-        currentCall = call;
-        call.on('stream', remoteStream => {
-          remoteVideo.srcObject = remoteStream;
-        });
-        call.on('close', () => {
-          remoteVideo.srcObject = null;
-          logCall(`Call with ${call.peer} ended`);
-        });
-        logCall(`Call started with ${call.peer}`);
-      }
-
-      window.makeCall = () => {
-        const targetId = document.getElementById("targetId").value.trim();
-        if (!allowedEmails.includes(targetId)) {
-          showModal("Invalid Contact", "That user is not registered.");
-          return;
-        }
-        const call = peer.call(targetId, stream);
-        handleStream(call);
-        document.getElementById("ringtone").play();
-      };
-
-      window.endCall = () => {
-        if (currentCall) {
-          currentCall.close();
-          currentCall = null;
-          remoteVideo.srcObject = null;
-        }
-      };
     });
 
-    function logCall(msg) {
-      const entry = document.createElement("div");
-      entry.className = "call-log";
-      entry.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
-      document.getElementById("callLogs").prepend(entry);
+    function handleStream(call) {
+      currentCall = call;
+      call.on('stream', remoteStream => {
+        document.getElementById("remoteVideo").srcObject = remoteStream;
+      });
+      call.on('close', () => {
+        document.getElementById("remoteVideo").srcObject = null;
+        logCall(`Call with ${call.peer} ended`);
+      });
+      logCall(`Call started with ${call.peer}`);
+    }
+  }
+
+  function makeCall() {
+    const targetId = document.getElementById("targetId").value.trim();
+    if (!allowedEmails.includes(targetId)) {
+      showModal("Invalid Contact", "That user is not registered.");
+      return;
+    }
+
+    if (!peer || !stream) {
+      showModal("Error", "System not ready yet. Try again shortly.");
+      return;
+    }
+
+    const call = peer.call(targetId, stream);
+    handleStream(call);
+    document.getElementById("ringtone").play();
+  }
+
+  function endCall() {
+    if (currentCall) {
+      currentCall.close();
+      currentCall = null;
+      document.getElementById("remoteVideo").srcObject = null;
     }
   }
 
@@ -330,6 +328,13 @@
     document.getElementById("popupModal").style.display = "none";
   }
 
+  function logCall(msg) {
+    const entry = document.createElement("div");
+    entry.className = "call-log";
+    entry.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
+    document.getElementById("callLogs").prepend(entry);
+  }
+
   window.onload = () => {
     const stored = localStorage.getItem("novanetUser");
     if (stored) {
@@ -338,5 +343,6 @@
     }
   };
 </script>
+
 </body>
 </html>
