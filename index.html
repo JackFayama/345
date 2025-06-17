@@ -3,50 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NovaNET Call</title>
+  <title>NovaFX Video Call</title>
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <style>
     body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f3f4f6;
       margin: 0;
-      font-family: sans-serif;
-      background: #f9fafb;
+      padding-top: 80px; /* Space for fixed header */
     }
-
-    .topbar {
+    .header-fixed {
       position: fixed;
       top: 0;
-      left: 0;
       width: 100%;
-      background: #16a34a;
+      z-index: 1000;
+      background: #1e5e4b;
       color: white;
-      padding: 10px 20px;
-      font-weight: bold;
-      text-align: left;
-      z-index: 999;
     }
-
-    .welcome {
-      margin-top: 50px;
-      padding: 8px 20px;
-      font-size: 16px;
-      color: #16a34a;
-      font-weight: 500;
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      font-weight: bold;
+    }
+    .welcome-bar {
+      display: flex;
+      align-items: center;
+      padding: 8px 16px;
+      background: #256d5a;
+      gap: 8px;
+    }
+    .welcome-avatar {
+      background: #9333ea;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
     }
 
     .container {
       max-width: 600px;
-      margin: 10px auto;
-      background: white;
-      padding: 20px;
+      background: #fff;
+      padding: 1.2rem;
       border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin: 1rem auto;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      width: 90%;
     }
 
     input, select {
       width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      border-radius: 8px;
+      padding: 8px;
+      margin-top: 8px;
+      border-radius: 6px;
       border: 1px solid #ccc;
     }
 
@@ -54,28 +69,28 @@
       background: #16a34a;
       color: white;
       font-weight: bold;
+      padding: 6px 12px;
+      margin: 8px 4px 0 0;
       border: none;
-      border-radius: 8px;
-      padding: 10px 14px;
+      border-radius: 6px;
       cursor: pointer;
-      margin-top: 10px;
+      font-size: 14px;
     }
 
-    .video-box {
-      margin-top: 20px;
+    .video-wrapper {
       position: relative;
-      background: black;
-      height: 240px;
+      width: 100%;
+      height: 260px;
+      background: #000;
       border-radius: 10px;
       overflow: hidden;
+      margin-top: 10px;
     }
-
     #remoteVideo {
       width: 100%;
       height: 100%;
       object-fit: cover;
     }
-
     #localVideo {
       position: absolute;
       bottom: 10px;
@@ -84,47 +99,59 @@
       height: 90px;
       border: 2px solid #fff;
       border-radius: 8px;
+      background: #000;
       object-fit: cover;
     }
 
-    .row {
+    .btn-group {
       display: flex;
+      justify-content: center;
       gap: 10px;
+      flex-wrap: wrap;
       margin-top: 10px;
-    }
-
-    .row input {
-      flex: 2;
-    }
-
-    .row button {
-      flex: 1;
-      margin-top: 0;
     }
 
     .modal {
       display: none;
       position: fixed;
-      top: 50%; left: 50%;
+      top: 50%;
+      left: 50%;
       transform: translate(-50%, -50%);
       background: white;
-      padding: 20px;
+      padding: 1.5rem;
       border-radius: 12px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.3);
-      z-index: 1000;
+      box-shadow: 0 0 20px rgba(0,0,0,0.3);
+      z-index: 999;
       text-align: center;
     }
 
     .call-log {
-      padding: 10px;
-      background: #f3f4f6;
-      border-left: 4px solid #16a34a;
-      margin: 8px 0;
+      background: #f9fafb;
+      padding: 10px 14px;
       border-radius: 8px;
+      margin: 6px 0;
+      border-left: 4px solid #16a34a;
     }
 
-    @media (max-width: 600px) {
-      .row {
+    #callLogs > .call-log:nth-child(n+4) {
+      display: none;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 640px) {
+      .video-wrapper {
+        height: 200px;
+      }
+      #localVideo {
+        width: 90px;
+        height: 70px;
+      }
+      .input-row {
         flex-direction: column;
       }
     }
@@ -132,165 +159,184 @@
 </head>
 <body>
 
-  <div class="topbar">NovaNET</div>
-  <div class="welcome" id="welcomeText">Welcome!</div>
+<!-- Fixed Header -->
+<div class="header-fixed">
+  <div class="header-top">
+    <span>NovaNET</span>
+  </div>
+  <div class="welcome-bar">
+    <div id="userInitial" class="welcome-avatar">J</div>
+    <span id="welcomeText">Welcome!</span>
+  </div>
+</div>
 
-  <div class="container" id="loginSection">
-    <input type="email" id="email" placeholder="Enter your email">
-    <button onclick="login()">Login</button>
+<!-- Login Section -->
+<div class="container" id="loginSection">
+  <h2>NovaFX Connect</h2>
+  <input type="email" id="email" placeholder="Enter your email to register/login">
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- Call Section -->
+<div class="container" id="callSection" style="display:none;">
+  <h3>Welcome: <span id="myIdDisplay"></span></h3>
+
+  <div class="input-row">
+    <select id="savedContacts">
+      <option value="">Select contact</option>
+    </select>
+    <input type="text" id="targetId" placeholder="Recipient's email">
   </div>
 
-  <div class="container" id="callSection" style="display:none;">
-    <div><strong>You are:</strong> <span id="myIdDisplay"></span></div>
+  <div class="btn-group">
+    <button onclick="makeCall()">📞 Call</button>
+    <button onclick="endCall()">❌ End</button>
+  </div>
 
-    <select id="savedContacts" onchange="document.getElementById('targetId').value=this.value;">
-      <option value="">Select Contact</option>
-    </select>
+  <div class="video-wrapper">
+    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="localVideo" autoplay muted playsinline></video>
+  </div>
 
-    <div class="row">
-      <input type="text" id="targetId" placeholder="Enter recipient email">
-      <button onclick="makeCall()">Call</button>
-    </div>
-
-    <button onclick="endCall()">End Call</button>
-
-    <div class="video-box">
-      <video id="remoteVideo" autoplay playsinline></video>
-      <video id="localVideo" autoplay muted playsinline></video>
-    </div>
-
+  <div>
     <h4>Call Logs</h4>
     <div id="callLogs"></div>
   </div>
+</div>
 
-  <!-- Popup Modal -->
-  <div class="modal" id="popupModal">
-    <h3 id="modalTitle"></h3>
-    <p id="modalMessage"></p>
-    <button onclick="closeModal()">OK</button>
-  </div>
+<!-- Feedback Modal -->
+<div class="modal" id="popupModal">
+  <h3 id="modalTitle">Title</h3>
+  <p id="modalMessage">Message</p>
+  <button onclick="closeModal()">OK</button>
+</div>
 
-  <!-- Incoming Call Modal -->
-  <div class="modal" id="incomingModal">
-    <h3>Incoming Call</h3>
-    <p id="callerEmail"></p>
+<!-- Incoming Call Modal -->
+<div class="modal" id="incomingModal">
+  <h3>Incoming Call</h3>
+  <p id="callerEmail"></p>
+  <div class="btn-group">
     <button id="acceptCall">Accept</button>
     <button id="declineCall">Decline</button>
   </div>
+</div>
 
-  <!-- Ringtone -->
-  <audio id="ringtone" src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg" preload="auto"></audio>
+<audio id="ringtone" src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg" preload="auto"></audio>
 
-  <script>
-    const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
-    let currentUser = "";
+<script>
+  const allowedEmails = ['jack@gmail.com', 'nelima@gmail.com', 'judith@gmail.com'];
+  let currentUser = "";
 
-    function login() {
-      const email = document.getElementById("email").value.trim().toLowerCase();
-      if (!allowedEmails.includes(email)) {
-        showModal("Access Denied", "Only registered NovaNET users can login.");
-        return;
-      }
+  function login() {
+    const email = document.getElementById("email").value.trim().toLowerCase();
+    if (!allowedEmails.includes(email)) {
+      showModal("Access Denied", "Only registered NovaNET users can login.");
+      return;
+    }
 
-      localStorage.setItem("novanetUser", email);
-      currentUser = email;
-      document.getElementById("loginSection").style.display = "none";
-      document.getElementById("callSection").style.display = "block";
+    localStorage.setItem("novanetUser", email);
+    currentUser = email;
+    document.getElementById("loginSection").style.display = "none";
+    document.getElementById("callSection").style.display = "block";
 
-      const namePart = email.split('@')[0];
-      document.getElementById("myIdDisplay").innerText = email;
-      document.getElementById("welcomeText").innerText = `Welcome ${namePart}!`;
+    const namePart = email.split('@')[0];
+    document.getElementById("myIdDisplay").innerText = email;
+    document.getElementById("userInitial").innerText = namePart.charAt(0).toUpperCase();
+    document.getElementById("welcomeText").innerText = `Welcome ${namePart}!`;
 
-      const contacts = allowedEmails.filter(e => e !== email);
-      const dropdown = document.getElementById("savedContacts");
-      dropdown.innerHTML = '<option value="">Select Contact</option>';
-      contacts.forEach(e => {
-        const opt = document.createElement("option");
-        opt.value = e;
-        opt.textContent = e;
-        dropdown.appendChild(opt);
-      });
+    // Set dropdown options
+    const contacts = allowedEmails.filter(e => e !== email);
+    const dropdown = document.getElementById("savedContacts");
+    contacts.forEach(e => {
+      const opt = document.createElement("option");
+      opt.value = e;
+      opt.textContent = e;
+      dropdown.appendChild(opt);
+    });
 
-      const peer = new Peer(email, { debug: 2 });
-      const localVideo = document.getElementById("localVideo");
-      const remoteVideo = document.getElementById("remoteVideo");
-      let currentCall = null;
+    const peer = new Peer(email, {
+      debug: 2
+    });
 
-      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-        localVideo.srcObject = stream;
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+    let currentCall = null;
 
-        peer.on('call', call => {
-          document.getElementById("incomingModal").style.display = "block";
-          document.getElementById("callerEmail").textContent = call.peer;
-          document.getElementById("acceptCall").onclick = () => {
-            call.answer(stream);
-            document.getElementById("incomingModal").style.display = "none";
-            handleStream(call);
-          };
-          document.getElementById("declineCall").onclick = () => {
-            call.close();
-            document.getElementById("incomingModal").style.display = "none";
-            logCall(`Declined call from ${call.peer}`);
-          };
-        });
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      localVideo.srcObject = stream;
 
-        function handleStream(call) {
-          currentCall = call;
-          call.on('stream', remoteStream => {
-            remoteVideo.srcObject = remoteStream;
-          });
-          call.on('close', () => {
-            remoteVideo.srcObject = null;
-            logCall(`Call with ${call.peer} ended`);
-          });
-          logCall(`Call started with ${call.peer}`);
-        }
-
-        window.makeCall = () => {
-          const targetId = document.getElementById("targetId").value.trim();
-          if (!allowedEmails.includes(targetId)) {
-            showModal("Invalid Contact", "That user is not registered.");
-            return;
-          }
-          const call = peer.call(targetId, stream);
+      peer.on('call', call => {
+        document.getElementById("incomingModal").style.display = "block";
+        document.getElementById("callerEmail").textContent = call.peer;
+        document.getElementById("acceptCall").onclick = () => {
+          call.answer(stream);
+          document.getElementById("incomingModal").style.display = "none";
           handleStream(call);
-          document.getElementById("ringtone").play();
         };
-
-        window.endCall = () => {
-          if (currentCall) {
-            currentCall.close();
-            currentCall = null;
-            remoteVideo.srcObject = null;
-          }
+        document.getElementById("declineCall").onclick = () => {
+          call.close();
+          document.getElementById("incomingModal").style.display = "none";
+          logCall(`Declined call from ${call.peer}`);
         };
       });
 
-      function logCall(msg) {
-        const entry = document.createElement("div");
-        entry.className = "call-log";
-        entry.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
-        document.getElementById("callLogs").prepend(entry);
+      function handleStream(call) {
+        currentCall = call;
+        call.on('stream', remoteStream => {
+          remoteVideo.srcObject = remoteStream;
+        });
+        call.on('close', () => {
+          remoteVideo.srcObject = null;
+          logCall(`Call with ${call.peer} ended`);
+        });
+        logCall(`Call started with ${call.peer}`);
       }
-    }
 
-    function showModal(title, message) {
-      document.getElementById("modalTitle").textContent = title;
-      document.getElementById("modalMessage").textContent = message;
-      document.getElementById("popupModal").style.display = "block";
-    }
+      window.makeCall = () => {
+        const targetId = document.getElementById("targetId").value.trim();
+        if (!allowedEmails.includes(targetId)) {
+          showModal("Invalid Contact", "That user is not registered.");
+          return;
+        }
+        const call = peer.call(targetId, stream);
+        handleStream(call);
+        document.getElementById("ringtone").play();
+      };
 
-    function closeModal() {
-      document.getElementById("popupModal").style.display = "none";
-    }
+      window.endCall = () => {
+        if (currentCall) {
+          currentCall.close();
+          currentCall = null;
+          remoteVideo.srcObject = null;
+        }
+      };
+    });
 
-    window.onload = () => {
-      const stored = localStorage.getItem("novanetUser");
-      if (stored) {
-        document.getElementById("email").value = stored;
-        login();
-      }
-    };
-  </script>
+    function logCall(msg) {
+      const entry = document.createElement("div");
+      entry.className = "call-log";
+      entry.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
+      document.getElementById("callLogs").prepend(entry);
+    }
+  }
+
+  function showModal(title, message) {
+    document.getElementById("modalTitle").textContent = title;
+    document.getElementById("modalMessage").textContent = message;
+    document.getElementById("popupModal").style.display = "block";
+  }
+
+  function closeModal() {
+    document.getElementById("popupModal").style.display = "none";
+  }
+
+  window.onload = () => {
+    const stored = localStorage.getItem("novanetUser");
+    if (stored) {
+      document.getElementById("email").value = stored;
+      login();
+    }
+  };
+</script>
 </body>
 </html>
