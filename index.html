@@ -5,107 +5,75 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>NovaFX Video Call</title>
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f3f4f6;
-      margin: 0; padding: 0;
-      display: flex; flex-direction: column;
-      align-items: center;
-    }
-    .container {
-      max-width: 500px;
-      background: #fff;
-      padding: 2rem;
-      border-radius: 12px;
-      margin-top: 2rem;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-      width: 90%;
-    }
-    h2 {
-      color: #16a34a;
-    }
-    input, button, select {
-      width: 100%;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-    }
-    button {
-      background: #16a34a;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    video {
-      width: 100%;
-      margin-top: 10px;
-      border-radius: 10px;
-      background: black;
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      padding: 1.5rem;
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.3);
-      z-index: 999;
-    }
-    .modal h3 {
-      margin-top: 0;
-    }
-    .log-section, .contacts-section {
-      margin-top: 1rem;
-      text-align: left;
-    }
-    .log-entry {
-      font-size: 14px;
-      margin-bottom: 4px;
-    }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-100 font-sans flex flex-col items-center min-h-screen p-4">
 
-  <div class="container" id="loginSection">
-    <h2>NovaFX Connect</h2>
-    <input type="email" id="email" placeholder="Enter your email to register/login">
-    <button onclick="login()">Login</button>
+  <!-- Login Section -->
+  <div class="w-full max-w-md bg-white p-6 rounded-2xl shadow-md" id="loginSection">
+    <h2 class="text-green-600 text-2xl font-semibold mb-4">NovaFX Connect</h2>
+    <input type="email" id="email" placeholder="Enter your email to register/login" class="w-full p-3 border border-gray-300 rounded-lg mb-4">
+    <button onclick="login()" class="w-full bg-green-600 text-white font-semibold py-2 rounded-lg">Login</button>
   </div>
 
-  <div class="container" id="callSection" style="display:none;">
-    <h3>Welcome: <span id="myIdDisplay"></span></h3>
-    <select id="savedContacts"><option value="">Select saved contact</option></select>
-    <input type="text" id="targetId" placeholder="Enter recipient's email to call">
-    <button onclick="makeCall()">Call</button>
-    <button onclick="endCall()">End Call</button>
-    <video id="localVideo" autoplay muted playsinline></video>
-    <video id="remoteVideo" autoplay playsinline></video>
-    <div class="contacts-section">
-      <button onclick="saveCurrentContact()">Save This Contact</button>
+  <!-- Call Section -->
+  <div class="w-full max-w-5xl bg-white p-6 rounded-2xl shadow-md mt-6 hidden" id="callSection">
+    <h3 class="text-xl mb-4 font-semibold">Welcome: <span id="myIdDisplay" class="text-green-700"></span></h3>
+    
+    <div class="flex flex-col lg:flex-row gap-4">
+      <div class="flex-1">
+        <select id="savedContacts" class="w-full p-3 border border-gray-300 rounded-lg mb-2">
+          <option value="">Select saved contact</option>
+        </select>
+        <input type="text" id="targetId" placeholder="Enter recipient's email to call" class="w-full p-3 border border-gray-300 rounded-lg mb-2">
+        <button onclick="makeCall()" class="w-full bg-green-600 text-white font-semibold py-2 rounded-lg mb-2">Call</button>
+        <button onclick="endCall()" class="w-full bg-red-600 text-white font-semibold py-2 rounded-lg">End Call</button>
+      </div>
+
+      <div class="flex-1 flex flex-col lg:flex-row gap-4 justify-between">
+        <!-- Local Video -->
+        <div class="relative rounded-2xl overflow-hidden bg-black w-full">
+          <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded-md z-10">You</div>
+          <video id="localVideo" autoplay muted playsinline class="w-full h-auto rounded-2xl"></video>
+        </div>
+
+        <!-- Remote Video -->
+        <div class="relative rounded-2xl overflow-hidden bg-black w-full">
+          <div id="remoteUserLabel" class="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded-md z-10"></div>
+          <video id="remoteVideo" autoplay playsinline class="w-full h-auto rounded-2xl"></video>
+        </div>
+      </div>
     </div>
-    <div class="log-section">
-      <h4>Call Logs</h4>
-      <div id="callLogs"></div>
+
+    <div class="mt-4">
+      <button onclick="saveCurrentContact()" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save This Contact</button>
+    </div>
+
+    <div class="mt-4">
+      <h4 class="text-lg font-semibold mb-2">Call Logs</h4>
+      <div id="callLogs" class="text-sm text-gray-700 space-y-1"></div>
     </div>
   </div>
 
-  <!-- Modal -->
-  <div class="modal" id="popupModal">
-    <h3 id="modalTitle">Title</h3>
-    <p id="modalMessage">Message</p>
-    <button onclick="closeModal()">OK</button>
+  <!-- Popup Modal -->
+  <div id="popupModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl p-6 w-80 text-center">
+      <h3 id="modalTitle" class="text-lg font-semibold mb-2">Title</h3>
+      <p id="modalMessage" class="text-gray-700 mb-4">Message</p>
+      <button onclick="closeModal()" class="bg-green-600 text-white px-4 py-2 rounded">OK</button>
+    </div>
   </div>
 
   <!-- Incoming Call Modal -->
-  <div class="modal" id="incomingModal">
-    <h3>Incoming Call</h3>
-    <p id="callerEmail"></p>
-    <button onclick="acceptCall()">Accept</button>
-    <button onclick="declineCall()">Decline</button>
+  <div id="incomingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl p-6 w-80 text-center">
+      <h3 class="text-lg font-semibold mb-2">Incoming Call</h3>
+      <p id="callerEmail" class="text-gray-800 mb-4"></p>
+      <div class="flex justify-between space-x-4">
+        <button onclick="acceptCall()" class="bg-green-600 text-white px-4 py-2 rounded">Accept</button>
+        <button onclick="declineCall()" class="bg-red-600 text-white px-4 py-2 rounded">Decline</button>
+      </div>
+    </div>
   </div>
 
   <script>
